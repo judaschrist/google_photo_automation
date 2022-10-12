@@ -17,9 +17,12 @@ class GooglePhotosApi:
                  api_name = 'photoslibrary',
                  client_secret_file=CLIENT_SECRET_FILE,
                  api_version = 'v1',
+                 # change scopes according the use case
+                 # see https://developers.google.com/photos/library/guides/authorization
                  scopes = [
                     'https://www.googleapis.com/auth/photoslibrary.appendonly',
-                    'https://www.googleapis.com/auth/photoslibrary.readonly',]):
+                    'https://www.googleapis.com/auth/photoslibrary.readonly',
+                ]):
         '''
         Args:
             client_secret_file: string, location where the requested credentials are saved
@@ -38,7 +41,7 @@ class GooglePhotosApi:
         self.run_local_server()
 
     def run_local_server(self):
-        # is checking if there is already a pickle file with relevant credentials
+        # checking if there is already a pickle file with relevant credentials
         if os.path.exists(self.cred_pickle_file):
             with open(self.cred_pickle_file, 'rb') as token:
                 self.cred = pickle.load(token)
@@ -72,12 +75,14 @@ class GooglePhotosApi:
                     ]
                 },
                 # TODO people filter does not work very well
-                "contentFilter": {
-                    "includedContentCategories": [
-                        "PEOPLE"
-                    ]
-                }
-            }
+                # "contentFilter": {
+                #     "includedContentCategories": [
+                #         "PEOPLE"
+                #     ]
+                # }
+            },
+            #TODO: add pagination according to https://developers.google.com/photos/library/guides/list#pagination
+            "pageSize": 100
         }
         headers = {
             'content-type': 'application/json',
@@ -86,8 +91,9 @@ class GooglePhotosApi:
         
         res = requests.request("POST", url, data=json.dumps(payload), headers=headers)
         try:
-            if 'mediaItems' in res.json():
+            if 'mediaItems' not in res.json():
                 print("No media items found")
+                return
             for i, item in enumerate(res.json()['mediaItems']):
                 print(f"==== Uploading phone {i}: {item['filename']} ====")
                 # print(item)
@@ -116,4 +122,4 @@ if __name__ == '__main__':
     gclient = GooglePhotosApi()
     # creds = google_photos_api.run_local_server()
 
-    gclient.upload_from_google_photo_to_bucket(2022, 10, 3, dry_run=True)
+    gclient.upload_from_google_photo_to_bucket(2022, 10, 9, dry_run=True)
