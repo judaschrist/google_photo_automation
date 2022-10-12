@@ -17,7 +17,9 @@ class GooglePhotosApi:
                  api_name = 'photoslibrary',
                  client_secret_file=CLIENT_SECRET_FILE,
                  api_version = 'v1',
-                 scopes = ['https://www.googleapis.com/auth/photoslibrary']):
+                 scopes = [
+                    'https://www.googleapis.com/auth/photoslibrary.appendonly',
+                    'https://www.googleapis.com/auth/photoslibrary.readonly',]):
         '''
         Args:
             client_secret_file: string, location where the requested credentials are saved
@@ -30,7 +32,7 @@ class GooglePhotosApi:
         self.client_secret_file = client_secret_file
         self.api_version = api_version
         self.scopes = scopes
-        self.cred_pickle_file = f'/Users/lingxiao/workspace/google_keys/token_{self.api_name}_{self.api_version}.pickle'
+        self.cred_pickle_file = f'token_{self.api_name}_{self.api_version}.pickle'
 
         self.cred = None
         self.run_local_server()
@@ -55,7 +57,7 @@ class GooglePhotosApi:
         return self.cred
 
 
-    def upload_from_google_photo_to_bucket(self, year, month, day):
+    def upload_from_google_photo_to_bucket(self, year, month, day, dry_run=False):
         url = 'https://photoslibrary.googleapis.com/v1/mediaItems:search'
         payload = {
             "filters": {
@@ -69,12 +71,12 @@ class GooglePhotosApi:
                         
                     ]
                 },
-                # TODO add people filter
-                # "contentFilter": {
-                #     "includedContentCategories": [
-                #         "PEOPLE"
-                #     ]
-                # }
+                # TODO people filter does not work very well
+                "contentFilter": {
+                    "includedContentCategories": [
+                        "PEOPLE"
+                    ]
+                }
             }
         }
         headers = {
@@ -84,6 +86,8 @@ class GooglePhotosApi:
         
         res = requests.request("POST", url, data=json.dumps(payload), headers=headers)
         try:
+            if 'mediaItems' in res.json():
+                print("No media items found")
             for i, item in enumerate(res.json()['mediaItems']):
                 print(f"==== Uploading phone {i}: {item['filename']} ====")
                 # print(item)
@@ -92,8 +96,8 @@ class GooglePhotosApi:
                     base_url += '=d'
                 else:
                     base_url += '=dv'
-                
-                # upload_to_google_cload(base_url, f"{year}_{month}_{day}_{item['filename']}", item['mimeType'])
+                if not dry_run:
+                    upload_to_google_cload(base_url, f"{year}_{month}_{day}_{item['filename']}", item['mimeType'])
         except Exception as e:
             print(res.json())
             raise e
@@ -112,4 +116,4 @@ if __name__ == '__main__':
     gclient = GooglePhotosApi()
     # creds = google_photos_api.run_local_server()
 
-    gclient.upload_from_google_photo_to_bucket(2022, 10, 9)
+    gclient.upload_from_google_photo_to_bucket(2022, 10, 3, dry_run=True)
