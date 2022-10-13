@@ -1,5 +1,6 @@
 
 from google.cloud import storage
+import datetime
 import pickle
 import os
 from google_auth_oauthlib.flow import Flow, InstalledAppFlow
@@ -9,7 +10,7 @@ import json
 
 
 CLIENT_SECRET_FILE = "/Users/lingxiao/workspace/google_keys/credentials.json"
-BUCKET_NAME = "test-bucket-gpa"
+TEST_BUCKET_NAME = "test-bucket-gpa"
 ADA_ALBUM_ID = "AKllbf1C1gz3LARx1H2d7xnY8Twr0ormAqs9E2QWMeBKOStro1qrXcezAxRBTTXkU-weB3N0WD7C"
 
 class GooglePhotosApi:
@@ -59,8 +60,18 @@ class GooglePhotosApi:
         
         return self.cred
 
-
-    def upload_from_google_photo_to_bucket(self, year, month, day, dry_run=False):
+    def upload_from_google_photo_to_bucket(self, year, month, day, bucket_name, dry_run=False):
+        '''
+        Uploads all photos from a given day to a bucket
+        Args:
+            year: int, year of the day
+            month: int, month of the day
+            day: int, date of the day
+            bucket_name: string, name of the bucket
+            dry_run: boolean, if True, only prints the files that would be uploaded without actually uploading them
+        returns:
+            A list of the file names that were uploaded
+        '''
         url = 'https://photoslibrary.googleapis.com/v1/mediaItems:search'
         payload = {
             "filters": {
@@ -93,25 +104,31 @@ class GooglePhotosApi:
         try:
             if 'mediaItems' not in res.json():
                 print("No media items found")
-                return
+                return []
+            file_name_list = []
             for i, item in enumerate(res.json()['mediaItems']):
                 print(f"==== Uploading phone {i}: {item['filename']} ====")
-                # print(item)
                 base_url = item['baseUrl']
                 if 'photo' in item['mediaMetadata']:
                     base_url += '=d'
                 else:
                     base_url += '=dv'
                 if not dry_run:
-                    upload_to_google_cload(base_url, f"{year}_{month}_{day}_{item['filename']}", item['mimeType'])
+                    target_file_name = f"{year}_{month}_{day}_uploaded_at_{get_current_timestamp()}_{item['filename']}"
+                    upload_to_google_cload(base_url, target_file_name, item['mimeType'], bucket_name)
+                    file_name_list.append(target_file_name)
+            return file_name_list
         except Exception as e:
             print(res.json())
             raise e
+
+def get_current_timestamp():
+    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             
-def upload_to_google_cload(url, target_file_name, content_type):
+def upload_to_google_cload(url, target_file_name, content_type, bucket_name):
     storage_client = storage.Client()
 
-    bucket = storage_client.get_bucket(BUCKET_NAME)
+    bucket = storage_client.get_bucket(bucket_name)
     blob = bucket.blob(target_file_name)
     blob.upload_from_string(requests.get(url).content, content_type=content_type) 
 
@@ -122,4 +139,4 @@ if __name__ == '__main__':
     gclient = GooglePhotosApi()
     # creds = google_photos_api.run_local_server()
 
-    gclient.upload_from_google_photo_to_bucket(2022, 10, 9, dry_run=True)
+    print(gclient.upload_from_google_photo_to_bucket(2022, 10, 9, TEST_BUCKET_NAME, dry_run=False))
