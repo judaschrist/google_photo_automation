@@ -9,11 +9,14 @@ import requests
 import json
 
 
-CLIENT_SECRET_FILE = "/Users/lingxiao/workspace/google_keys/credentials.json"
-TEST_BUCKET_NAME = "test-bucket-gpa"
+CLIENT_SECRET_FILE = "secrets/google_photo_credentials.json"
 ADA_ALBUM_ID = "AKllbf1C1gz3LARx1H2d7xnY8Twr0ormAqs9E2QWMeBKOStro1qrXcezAxRBTTXkU-weB3N0WD7C"
 
-class GooglePhotosApi:
+class GooglePhotoHelper:
+    '''
+    Helper class to manage medias files in Google Photo
+    '''
+
     def __init__(self,
                  api_name = 'photoslibrary',
                  client_secret_file=CLIENT_SECRET_FILE,
@@ -114,7 +117,8 @@ class GooglePhotosApi:
                 else:
                     base_url += '=dv'
                 if not dry_run:
-                    target_file_name = f"{year}_{month}_{day}_uploaded_at_{get_current_timestamp()}_{item['filename']}"
+                    # preserving the original file name when uploading.
+                    target_file_name = item['filename']
                     upload_to_google_cload(base_url, target_file_name, item['mimeType'], bucket_name)
                     file_name_list.append(target_file_name)
             return file_name_list
@@ -125,18 +129,12 @@ class GooglePhotosApi:
 def get_current_timestamp():
     return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             
-def upload_to_google_cload(url, target_file_name, content_type, bucket_name):
+def upload_url_to_google_cload(url, target_file_name, content_type, bucket_name):
+    '''
+    Uploads a file from a given url to a bucket
+    '''
     storage_client = storage.Client()
 
     bucket = storage_client.get_bucket(bucket_name)
     blob = bucket.blob(target_file_name)
-    blob.upload_from_string(requests.get(url).content, content_type=content_type) 
-
-if __name__ == '__main__':
-    # upload_to_google_cload()
-
-    # initialize photos api and create service
-    gclient = GooglePhotosApi()
-    # creds = google_photos_api.run_local_server()
-
-    print(gclient.upload_from_google_photo_to_bucket(2022, 10, 9, TEST_BUCKET_NAME, dry_run=False))
+    blob.upload_from_string(requests.get(url).content, content_type=content_type)

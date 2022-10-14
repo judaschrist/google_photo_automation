@@ -1,11 +1,14 @@
-from photo_api import TEST_BUCKET_NAME
+from types import List
+from photo_api import GooglePhotoHelper
 from google.cloud import vision_v1
 
+TEST_BUCKET_NAME = "test-bucket-gpa"
 
-def sample_async_batch_annotate_images(
-    bucket_name,
-    input_image_file_name_list=["gs://test-bucket-gpa/IMG_6010.JPG"],
-    output_file_name="gs://test-bucket-gpa/IMG_6010",
+def async_batch_annotate_images(
+    bucket_name: str,
+    input_image_file_name_list: List[str],
+    output_file_prefix: str,
+    annotation_type: vision_v1.Feature.Type,
 ):
     """
     Perform async batch image annotation.
@@ -13,7 +16,7 @@ def sample_async_batch_annotate_images(
     client = vision_v1.ImageAnnotatorClient()
 
     features = [
-        {"type_": vision_v1.Feature.Type.FACE_DETECTION},
+        {"type_": annotation_type},
     ]
 
     # Each requests element corresponds to a single image.  To annotate more
@@ -21,7 +24,7 @@ def sample_async_batch_annotate_images(
     # the array of requests
     # requests = [{"image": image, "features": features}]
     requests = [{"image": {"source":  {"image_uri": f"gs://{bucket_name}/{file_name}"}}, "features": features} for file_name in input_image_file_name_list]
-    gcs_destination = {"uri": f"gs://{bucket_name}/{output_file_name}"}
+    gcs_destination = {"uri": f"gs://{bucket_name}/{output_file_prefix}"}
 
     # The max number of responses to output in each JSON file
     batch_size = len(input_image_file_name_list)
@@ -42,4 +45,7 @@ def sample_async_batch_annotate_images(
 
 if __name__ == '__main__':
     # detect_faces('/Users/lingxiao/Downloads/IMG_6010.JPG')
-    sample_async_batch_annotate_images(TEST_BUCKET_NAME, ['2022_10_9_uploaded_at_20221013_145536_IMG_8461.JPG', '2022_10_9_uploaded_at_20221013_145540_IMG_8460.JPG', '2022_10_9_uploaded_at_20221013_145543_IMG_8459.JPG', '2022_10_9_uploaded_at_20221013_145547_IMG_6083.MOV', '2022_10_9_uploaded_at_20221013_145559_IMG_6082.HEIC', '2022_10_9_uploaded_at_20221013_145604_IMG_6081.HEIC', '2022_10_9_uploaded_at_20221013_145609_IMG_6080.HEIC', '2022_10_9_uploaded_at_20221013_145613_IMG_6079.HEIC', '2022_10_9_uploaded_at_20221013_145617_IMG_6078.HEIC', '2022_10_9_uploaded_at_20221013_145622_IMG_6077.HEIC', '2022_10_9_uploaded_at_20221013_145627_IMG_6076.HEIC', '2022_10_9_uploaded_at_20221013_145631_IMG_6075.MOV', '2022_10_9_uploaded_at_20221013_145640_IMG_8458.JPG', '2022_10_9_uploaded_at_20221013_145645_IMG_8457.JPG', '2022_10_9_uploaded_at_20221013_145650_IMG_8456.JPG', '2022_10_9_uploaded_at_20221013_145655_IMG_8455.JPG', '2022_10_9_uploaded_at_20221013_145659_IMG_8454.JPG', '2022_10_9_uploaded_at_20221013_145704_IMG_8453.JPG', '2022_10_9_uploaded_at_20221013_145709_IMG_8452.JPG', '2022_10_9_uploaded_at_20221013_145715_IMG_8447.JPG', '2022_10_9_uploaded_at_20221013_145720_IMG_8446.JPG'], 'output-test')
+    # initialize photos api and create service
+    helper = GooglePhotoHelper()
+    file_name_list = helper.upload_from_google_photo_to_bucket(2022, 10, 11, TEST_BUCKET_NAME, dry_run=False)
+    async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, 'test_', vision_v1.Feature.Type.FACE_DETECTION)
