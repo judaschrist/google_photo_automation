@@ -119,7 +119,7 @@ class GooglePhotoHelper:
                 if not dry_run:
                     # preserving the original file name when uploading.
                     target_file_name = item['filename']
-                    upload_to_google_cload(base_url, target_file_name, item['mimeType'], bucket_name)
+                    upload_url_to_google_cload(base_url, target_file_name, item['mimeType'], bucket_name)
                     file_name_list.append(target_file_name)
             return file_name_list
         except Exception as e:
