@@ -1,6 +1,13 @@
-from types import List
-from photo_api import GooglePhotoHelper
+from distutils.log import error
+from typing import List
+
+from scipy.misc import face
+from google_photo_api import GooglePhotoHelper
 from google.cloud import vision_v1
+import google_cloud_storage_api as cloud_api
+import json
+from PIL import Image
+from io import BytesIO
 
 TEST_BUCKET_NAME = "test-bucket-gpa"
 
@@ -42,10 +49,24 @@ def async_batch_annotate_images(
     print("Output written to GCS with prefix: {}".format(gcs_output_uri))
 
 
-
-if __name__ == '__main__':
-    # detect_faces('/Users/lingxiao/Downloads/IMG_6010.JPG')
-    # initialize photos api and create service
+def main():
     helper = GooglePhotoHelper()
     file_name_list = helper.upload_from_google_photo_to_bucket(2022, 10, 11, TEST_BUCKET_NAME, dry_run=False)
     async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, 'test_', vision_v1.Feature.Type.FACE_DETECTION)
+
+
+if __name__ == '__main__':
+    #read json from string:
+    face_detection_result_json = json.loads(cloud_api.read_file_from_google_cloud_to_string('test_output-1-to-14.json', TEST_BUCKET_NAME))
+    for detection_res in face_detection_result_json['responses']:
+        file_url = detection_res['context']['uri']
+        #open image from bytes
+        image = Image.open(BytesIO(cloud_api.read_file_from_gs_url_to_bytes(file_url)))
+        image.show()
+        if 'error' in detection_res:
+            continue
+        if 'faceAnnotations' in detection_res:
+            for faces in detection_res['faceAnnotations']:
+                image.crop((faces['boundingPoly']['vertices'][0]['x'], 
+                            faces['boundingPoly']['vertices'][0]['y'], faces['boundingPoly']['vertices'][2]['x'], faces['boundingPoly']['vertices'][2]['y'])).show()
+            

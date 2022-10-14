@@ -1,12 +1,11 @@
-
-from google.cloud import storage
 import datetime
 import pickle
 import os
-from google_auth_oauthlib.flow import Flow, InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import requests
 import json
+import google_cloud_storage_api as cloud_api
 
 
 CLIENT_SECRET_FILE = "secrets/google_photo_credentials.json"
@@ -119,7 +118,7 @@ class GooglePhotoHelper:
                 if not dry_run:
                     # preserving the original file name when uploading.
                     target_file_name = item['filename']
-                    upload_url_to_google_cload(base_url, target_file_name, item['mimeType'], bucket_name)
+                    cloud_api.upload_url_to_google_cload(base_url, target_file_name, item['mimeType'], bucket_name)
                     file_name_list.append(target_file_name)
             return file_name_list
         except Exception as e:
@@ -129,12 +128,3 @@ class GooglePhotoHelper:
 def get_current_timestamp():
     return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             
-def upload_url_to_google_cload(url, target_file_name, content_type, bucket_name):
-    '''
-    Uploads a file from a given url to a bucket
-    '''
-    storage_client = storage.Client()
-
-    bucket = storage_client.get_bucket(bucket_name)
-    blob = bucket.blob(target_file_name)
-    blob.upload_from_string(requests.get(url).content, content_type=content_type)
