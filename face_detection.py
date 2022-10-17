@@ -10,6 +10,8 @@ from PIL import Image
 from io import BytesIO
 
 TEST_BUCKET_NAME = "test-bucket-gpa"
+FACE_IMAGE_FILE_PREFIX = 'auto_detected_face_image_'
+FACE_ALBUM_NAME = 'auto_detected_face_images'
 
 def async_batch_annotate_images(
     bucket_name: str,
@@ -51,22 +53,39 @@ def async_batch_annotate_images(
 
 def main():
     helper = GooglePhotoHelper()
-    file_name_list = helper.upload_from_google_photo_to_bucket(2022, 10, 11, TEST_BUCKET_NAME, dry_run=False)
-    async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, 'test_', vision_v1.Feature.Type.FACE_DETECTION)
+    file_name_list = helper.upload_from_google_photo_to_bucket(2022, 10, 8, TEST_BUCKET_NAME, dry_run=False)
+    async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, '2022_10_08_', vision_v1.Feature.Type.FACE_DETECTION)
 
-
-if __name__ == '__main__':
-    #read json from string:
-    face_detection_result_json = json.loads(cloud_api.read_file_from_google_cloud_to_string('test_output-1-to-14.json', TEST_BUCKET_NAME))
+def upload_face_detection_result(detect_result_file_name, bucket_name):
+    # TODO: add date to the detected face image file name
+    # TODO: think about how to save other face informations like face landmarks
+    helper = GooglePhotoHelper()
+    album_id = helper.upsert_album(FACE_ALBUM_NAME)
+    face_detection_result_json = json.loads(cloud_api.read_file_from_google_cloud_to_string(detect_result_file_name, bucket_name))
     for detection_res in face_detection_result_json['responses']:
         file_url = detection_res['context']['uri']
-        #open image from bytes
-        image = Image.open(BytesIO(cloud_api.read_file_from_gs_url_to_bytes(file_url)))
-        image.show()
+        ori_file_name = file_url.split('/')[-1]
         if 'error' in detection_res:
             continue
         if 'faceAnnotations' in detection_res:
-            for faces in detection_res['faceAnnotations']:
-                image.crop((faces['boundingPoly']['vertices'][0]['x'], 
-                            faces['boundingPoly']['vertices'][0]['y'], faces['boundingPoly']['vertices'][2]['x'], faces['boundingPoly']['vertices'][2]['y'])).show()
-            
+            print('======== Found {} faces in {}'.format(len(detection_res['faceAnnotations']), ori_file_name))
+            image = Image.open(BytesIO(cloud_api.read_file_from_gs_url_to_bytes(file_url)))
+            for i, face in enumerate(detection_res['faceAnnotations']):
+                print('\t\tUploading face {} of {}'.format(i, ori_file_name))
+                # crop the faces from the image
+                face_crop = image.crop((
+                    face['boundingPoly']['vertices'][0]['x'], 
+                    face['boundingPoly']['vertices'][0]['y'],
+                    face['boundingPoly']['vertices'][2]['x'],
+                    face['boundingPoly']['vertices'][2]['y']
+                ))
+                # get bytes from the cropped image
+                face_crop_bytes = BytesIO()
+                face_crop.save(face_crop_bytes, format='JPEG')
+                # save the cropped image to album
+                helper.upload_image_to_photo_album(face_crop_bytes.getvalue(), f"{FACE_IMAGE_FILE_PREFIX}{i}_{ori_file_name}", album_id)
+
+
+if __name__ == '__main__':
+    # main()
+    upload_face_detection_result('2022_10_08_output-1-to-27.json', TEST_BUCKET_NAME)                      

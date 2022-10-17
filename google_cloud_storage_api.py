@@ -1,7 +1,7 @@
 from google.cloud import storage
 import requests
 
-def upload_url_to_google_cload(url, target_file_name, content_type, bucket_name):
+def upload_url_to_google_cloud(url, target_file_name, content_type, bucket_name):
     '''
     Uploads a file from a given url to a bucket
     '''
@@ -38,3 +38,4 @@ def read_file_from_gs_url_to_bytes(gs_url):
     bucket = storage_client.get_bucket(bucket_name)
     blob = bucket.blob(file_name)
     return blob.download_as_bytes()
+    

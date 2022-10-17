@@ -64,6 +64,7 @@ class GooglePhotoHelper:
 
     def upload_from_google_photo_to_bucket(self, year, month, day, bucket_name, dry_run=False):
         '''
+        TODO: exclude file created in the face detection album!!!!!!
         Uploads all photos from a given day to a bucket
         Args:
             year: int, year of the day
@@ -109,7 +110,7 @@ class GooglePhotoHelper:
                 return []
             file_name_list = []
             for i, item in enumerate(res.json()['mediaItems']):
-                print(f"==== Uploading phone {i}: {item['filename']} ====")
+                print(f"==== Uploading photo {i}: {item['filename']} ====")
                 base_url = item['baseUrl']
                 if 'photo' in item['mediaMetadata']:
                     base_url += '=d'
@@ -118,12 +119,95 @@ class GooglePhotoHelper:
                 if not dry_run:
                     # preserving the original file name when uploading.
                     target_file_name = item['filename']
-                    cloud_api.upload_url_to_google_cload(base_url, target_file_name, item['mimeType'], bucket_name)
+                    cloud_api.upload_url_to_google_cloud(base_url, target_file_name, item['mimeType'], bucket_name)
                     file_name_list.append(target_file_name)
             return file_name_list
         except Exception as e:
             print(res.json())
             raise e
+
+    def upload_image_to_photo_album(self, image_bytes, file_name, album_id):
+        '''
+        Uploads an image to a photo album
+        Args:
+            image_bytes: bytes, image data to be uploaded
+            album_id: string, id of the album to which the image will be uploaded
+        '''
+        url = 'https://photoslibrary.googleapis.com/v1/uploads'
+        headers = {
+            'content-type': 'application/octet-stream',
+            'Authorization': 'Bearer {}'.format(self.cred.token)
+        }
+        res = requests.request("POST", url, data=image_bytes, headers=headers)
+        # get the upload token as a string
+        upload_token = res.content.decode('utf-8')
+        url = 'https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate'
+        payload = {
+            "albumId": album_id,
+            "newMediaItems": [
+                {
+                    "description": "Uploaded from Ada",
+                    "simpleMediaItem": {
+                        "fileName": file_name,
+                        "uploadToken": upload_token
+                    }
+                }
+            ]
+        }
+        headers = {
+            'content-type': 'application/json',
+            'Authorization': 'Bearer {}'.format(self.cred.token)
+        }
+        res = requests.request("POST", url, data=json.dumps(payload), headers=headers)
+
+    def create_new_album(self, album_name):
+        '''
+        Creates a new album
+        Args:
+            album_name: string, name of the album
+        '''
+        url = 'https://photoslibrary.googleapis.com/v1/albums'
+        payload = {
+            "album": {
+                "title": album_name
+            }
+        }
+        headers = {
+            'content-type': 'application/json',
+            'Authorization': 'Bearer {}'.format(self.cred.token)
+        }
+        res = requests.request("POST", url, data=json.dumps(payload), headers=headers)
+        return res.json()['id']
+    
+    def find_albums_by_name(self, album_name):
+        '''
+        Finds all albums with a given name
+        Args:
+            album_name: string, name of the album
+        '''
+        url = 'https://photoslibrary.googleapis.com/v1/albums'
+        headers = {
+            'content-type': 'application/json',
+            'Authorization': 'Bearer {}'.format(self.cred.token)
+        }
+        res = requests.request("GET", url, headers=headers)
+        albums = res.json()['albums']
+        return [album for album in albums if album['title'] == album_name]
+
+    def upsert_album(self, album_name):
+        '''
+        Creates a new album if it does not exist, otherwise returns the existing album
+        Args:
+            album_name: string, name of the album
+        '''
+        albums = self.find_albums_by_name(album_name)
+        if len(albums) == 0:
+            album_id = self.create_new_album(album_name)
+        elif len(albums) == 1:
+            album_id = albums[0]['id']
+        else:
+            raise Exception('More than one album found, please delete all albums with the name of {}'.format(album_name))
+        return album_id
 
 def get_current_timestamp():
     return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
