@@ -209,6 +209,31 @@ class GooglePhotoHelper:
             raise Exception('More than one album found, please delete all albums with the name of {}'.format(album_name))
         return album_id
 
-def get_current_timestamp():
-    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    def list_face_download_urls_from_album(self, album_id, page_size=10):
+        '''
+        Lists all the base urls of the images in an album
+        Args:
+            album_id: string, id of the album
+        '''
+        url = 'https://photoslibrary.googleapis.com/v1/mediaItems:search'
+        payload = {
+            "albumId": album_id
+        }
+        headers = {
+            'content-type': 'application/json',
+            'Authorization': 'Bearer {}'.format(self.cred.token)
+        }
+        res = requests.request("POST", url, data=json.dumps(payload), headers=headers)
+        url_list = []
+        for item in res.json()['mediaItems']:
+            if item['filename'].startswith('auto_detected_face_image_'):
+                url_list.append(item['baseUrl'] + '=d')
+                if len(url_list) == page_size:
+                    break
+        return url_list
+
+if __name__ == '__main__':
+    helper = GooglePhotoHelper()
+    print(helper.list_face_download_urls_from_album(ADA_ALBUM_ID))
+
             
