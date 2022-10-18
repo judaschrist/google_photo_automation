@@ -8,6 +8,7 @@ import google_cloud_storage_api as cloud_api
 import json
 from PIL import Image
 from io import BytesIO
+import piexif
 
 TEST_BUCKET_NAME = "test-bucket-gpa"
 FACE_IMAGE_FILE_PREFIX = 'auto_detected_face_image_'
@@ -21,6 +22,7 @@ def async_batch_annotate_images(
 ):
     """
     Perform async batch image annotation.
+    return: the output file name
     """
     client = vision_v1.ImageAnnotatorClient()
 
@@ -48,17 +50,13 @@ def async_batch_annotate_images(
 
     # The output is written to GCS with the provided output_uri as prefix
     gcs_output_uri = response.output_config.gcs_destination.uri
-    print("Output written to GCS with prefix: {}".format(gcs_output_uri))
+    output_put_filename = f"{output_file_prefix}output-1-to-{batch_size}.json"
+
+    print("Output written to GCS with file name: {}".format(output_put_filename))
+    return output_put_filename
 
 
-def main():
-    helper = GooglePhotoHelper()
-    file_name_list = helper.upload_from_google_photo_to_bucket(2022, 10, 8, TEST_BUCKET_NAME, dry_run=False)
-    async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, '2022_10_08_', vision_v1.Feature.Type.FACE_DETECTION)
-
-def upload_face_detection_result(detect_result_file_name, bucket_name):
-    # TODO: add date to the detected face image file name
-    # TODO: think about how to save other face informations like face landmarks
+def upload_face_detection_result(detect_result_file_name, bucket_name, dry_run=False):
     helper = GooglePhotoHelper()
     album_id = helper.upsert_album(FACE_ALBUM_NAME)
     face_detection_result_json = json.loads(cloud_api.read_file_from_google_cloud_to_string(detect_result_file_name, bucket_name))
@@ -70,22 +68,47 @@ def upload_face_detection_result(detect_result_file_name, bucket_name):
         if 'faceAnnotations' in detection_res:
             print('======== Found {} faces in {}'.format(len(detection_res['faceAnnotations']), ori_file_name))
             image = Image.open(BytesIO(cloud_api.read_file_from_gs_url_to_bytes(file_url)))
+            # get image creation time
+            exif_dict = piexif.load(image.info['exif'])
+            if exif_dict and piexif.ExifIFD.DateTimeOriginal in exif_dict['Exif']:
+                image_creation_time = exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal][:10].decode('utf-8')
+            else:
+                image_creation_time = 'UNKONWN_TIME'
             for i, face in enumerate(detection_res['faceAnnotations']):
-                print('\t\tUploading face {} of {}'.format(i, ori_file_name))
-                # crop the faces from the image
-                face_crop = image.crop((
-                    face['boundingPoly']['vertices'][0]['x'], 
-                    face['boundingPoly']['vertices'][0]['y'],
-                    face['boundingPoly']['vertices'][2]['x'],
-                    face['boundingPoly']['vertices'][2]['y']
-                ))
-                # get bytes from the cropped image
-                face_crop_bytes = BytesIO()
-                face_crop.save(face_crop_bytes, format='JPEG')
-                # save the cropped image to album
-                helper.upload_image_to_photo_album(face_crop_bytes.getvalue(), f"{FACE_IMAGE_FILE_PREFIX}{i}_{ori_file_name}", album_id)
+                if not dry_run:
+                    # crop the faces from the image
+                    face_crop = image.crop((
+                        face['boundingPoly']['vertices'][0]['x'] if 'x' in face['boundingPoly']['vertices'][0] else 0,
+                        face['boundingPoly']['vertices'][0]['y'] if 'y' in face['boundingPoly']['vertices'][0] else 0,
+                        face['boundingPoly']['vertices'][2]['x'] if 'x' in face['boundingPoly']['vertices'][2] else image.width,
+                        face['boundingPoly']['vertices'][2]['y'] if 'y' in face['boundingPoly']['vertices'][2] else image.height,
+                    ))
+                    # add face detection meta data to exif
+                    if exif_dict:
+                        exif_dict['Exif'][piexif.ExifIFD.UserComment] = json.dumps(face).encode('utf-8')
+                    exif_bytes = piexif.dump(exif_dict)
+                    # get bytes from the cropped image
+                    face_crop_bytes = BytesIO()
+                    face_crop.save(face_crop_bytes, format='JPEG', exif=exif_bytes)
+                    # save the cropped image to album
+                    print('\t\tUploading face {} of {}'.format(i, ori_file_name))
+                    helper.upload_image_to_photo_album(face_crop_bytes.getvalue(), f"{FACE_IMAGE_FILE_PREFIX}{image_creation_time}_{i}_{ori_file_name}", album_id)
+                else:
+                    print(face['boundingPoly']['vertices'])
 
+
+
+def main():
+    helper = GooglePhotoHelper()
+    file_name_list = helper.upload_from_google_photo_to_bucket(2022, 10, 16, TEST_BUCKET_NAME, dry_run=False)
+    detection_result_file = async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, '2022_10_16_', vision_v1.Feature.Type.FACE_DETECTION)
+    upload_face_detection_result(detection_result_file, TEST_BUCKET_NAME)
 
 if __name__ == '__main__':
-    # main()
-    upload_face_detection_result('2022_10_08_output-1-to-27.json', TEST_BUCKET_NAME)                      
+    main()
+    # upload_face_detection_result('2022_10_08_output-1-to-27.json', TEST_BUCKET_NAME, dry_run=False)                   
+    
+    # open image and read exif
+    image = Image.open('/Users/lingxiao/Downloads/auto_detected_face_image_UNKONWN_TIME_0_IMG_6185.JPG')
+    exif_dict = piexif.load(image.info['exif'])
+    print(exif_dict['Exif'][piexif.ExifIFD.UserComment].decode('utf-8'))
