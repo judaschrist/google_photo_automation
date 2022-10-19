@@ -97,18 +97,31 @@ def upload_face_detection_result(detect_result_file_name, bucket_name, dry_run=F
                     print(face['boundingPoly']['vertices'])
 
 
+def read_exif_user_comment_from_image(file_path):
+    image = Image.open(file_path)
+    exif_dict = piexif.load(image.info['exif'])
+    return exif_dict['Exif'][piexif.ExifIFD.UserComment].decode('utf-8')
 
-def main():
+def face_image_generation_for_google_photo(year, month, day):
+    '''
+    Generate face images for google photo for a given date.
+    face images will be saved to a google photo album named 'auto_detected_face_images'
+    args:
+        year: 4 digits integer
+        month: 2 digits integer
+        day: 2 digits integer
+    '''
     helper = GooglePhotoHelper()
-    file_name_list = helper.upload_from_google_photo_to_bucket(2022, 10, 16, TEST_BUCKET_NAME, dry_run=False)
-    detection_result_file = async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, '2022_10_16_', vision_v1.Feature.Type.FACE_DETECTION)
+    file_name_list = helper.upload_from_google_photo_to_bucket(year, month, day, TEST_BUCKET_NAME, dry_run=False, exclude_file_prefix=FACE_IMAGE_FILE_PREFIX)
+    if not file_name_list:
+        print('No image found for {}-{}-{}'.format(year, month, day))
+        return
+    detection_result_file = async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, f'{year}_{month}_{day}_', vision_v1.Feature.Type.FACE_DETECTION)
     upload_face_detection_result(detection_result_file, TEST_BUCKET_NAME)
 
 if __name__ == '__main__':
-    main()
+    face_image_generation_for_google_photo(2022, 10, 19)
     # upload_face_detection_result('2022_10_08_output-1-to-27.json', TEST_BUCKET_NAME, dry_run=False)                   
     
     # open image and read exif
-    image = Image.open('/Users/lingxiao/Downloads/auto_detected_face_image_UNKONWN_TIME_0_IMG_6185.JPG')
-    exif_dict = piexif.load(image.info['exif'])
-    print(exif_dict['Exif'][piexif.ExifIFD.UserComment].decode('utf-8'))
+    # print(read_exif_user_comment_from_image('/Users/lingxiao/Downloads/auto_detected_face_image_2022_10_14_0_IMG_6158.jpg'))

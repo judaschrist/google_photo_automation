@@ -62,7 +62,7 @@ class GooglePhotoHelper:
         
         return self.cred
 
-    def upload_from_google_photo_to_bucket(self, year, month, day, bucket_name, dry_run=False):
+    def upload_from_google_photo_to_bucket(self, year, month, day, bucket_name, dry_run=False, exclude_file_prefix=None):
         '''
         TODO: exclude file created in the face detection album!!!!!!
         Uploads all photos from a given day to a bucket
@@ -72,6 +72,7 @@ class GooglePhotoHelper:
             day: int, date of the day
             bucket_name: string, name of the bucket
             dry_run: boolean, if True, only prints the files that would be uploaded without actually uploading them
+            exclude_file_prefix: string, if not None, files with this prefix will not be uploaded
         returns:
             A list of the file names that were uploaded
         '''
@@ -111,6 +112,9 @@ class GooglePhotoHelper:
             file_name_list = []
             for i, item in enumerate(res.json()['mediaItems']):
                 print(f"==== Uploading photo {i}: {item['filename']} ====")
+                if exclude_file_prefix is not None and item['filename'].startswith(exclude_file_prefix):
+                    print(f"Skipping file {item['filename']}")
+                    continue
                 base_url = item['baseUrl']
                 if 'photo' in item['mediaMetadata']:
                     base_url += '=d'
