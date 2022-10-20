@@ -10,6 +10,7 @@ import piexif
 import functions_framework
 from datetime import datetime, timedelta
 import base64
+from cloudevents.http.event import CloudEvent
 
 TEST_BUCKET_NAME = "test-bucket-gpa"
 FACE_IMAGE_FILE_PREFIX = 'auto_detected_face_image_'
@@ -114,9 +115,9 @@ def face_image_generation_for_google_photo(year, month, day, dry_run=False):
     '''
     print('================== processing image from {}-{}-{} ======================'.format(year, month, day))
     if dry_run:
-        return
+        print('================== dry run mode ======================')
     helper = GooglePhotoHelper()
-    file_name_list = helper.upload_from_google_photo_to_bucket(year, month, day, TEST_BUCKET_NAME, dry_run=False, exclude_file_prefix=FACE_IMAGE_FILE_PREFIX)
+    file_name_list = helper.upload_from_google_photo_to_bucket(year, month, day, TEST_BUCKET_NAME, dry_run=dry_run, exclude_file_prefix=FACE_IMAGE_FILE_PREFIX)
     if not file_name_list:
         print('No image found for {}-{}-{}'.format(year, month, day))
         return
@@ -126,21 +127,30 @@ def face_image_generation_for_google_photo(year, month, day, dry_run=False):
 
 # Triggered from a message on a Cloud Pub/Sub topic.
 @functions_framework.cloud_event
-def main(cloud_event):
-    # Print out the data from Pub/Sub, to prove that it worked
-    # print("Hello, " + base64.b64decode(cloud_event.data["message"]["data"]).decode() + "!")
-    # get the datetime of previous day:
-    target_day = datetime.now() - timedelta(days=3)
+def main(cloud_event: CloudEvent):
+    print("Hello, " + base64.b64decode(cloud_event.data["message"]["data"]).decode())
+    msg_json = json.loads(base64.b64decode(cloud_event.data["message"]["data"]).decode())
+    days_past = msg_json['days_past']
+    dry_run = msg_json['dry_run']
+    target_day = datetime.now() - timedelta(days=days_past)
     year = target_day.year
     month = target_day.month
     day = target_day.day
-    face_image_generation_for_google_photo(year, month, day, dry_run=True)
-    print("Hello, " + base64.b64decode(cloud_event.data["message"]["data"]).decode() + "!")
-# [END functions_cloudevent_pubsub]
+    face_image_generation_for_google_photo(year, month, day, dry_run=dry_run)
+
 
 if __name__ == '__main__':
-    main(None)
-    # upload_face_detection_result('2022_10_08_output-1-to-27.json', TEST_BUCKET_NAME, dry_run=False)                   
+    msg = {
+        "message": {
+            "data": base64.b64encode(json.dumps({
+                                "dry_run": True,
+                                "days_past": 3
+                            }).encode('utf-8'))
+        }
+    }
     
-    # open image and read exif
-    # print(read_exif_user_comment_from_image('/Users/lingxiao/Downloads/auto_detected_face_image_2022_10_14_0_IMG_6158.jpg'))
+    cloud_event = CloudEvent({
+        "type": "test",
+        "source": "local_test",
+    }, msg)
+    main(cloud_event)
