@@ -1,7 +1,5 @@
-from distutils.log import error
 from typing import List
 
-from scipy.misc import face
 from google_photo_api import GooglePhotoHelper
 from google.cloud import vision_v1
 import google_cloud_storage_api as cloud_api

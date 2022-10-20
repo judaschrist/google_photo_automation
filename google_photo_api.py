@@ -64,7 +64,6 @@ class GooglePhotoHelper:
 
     def upload_from_google_photo_to_bucket(self, year, month, day, bucket_name, dry_run=False, exclude_file_prefix=None):
         '''
-        TODO: exclude file created in the face detection album!!!!!!
         Uploads all photos from a given day to a bucket
         Args:
             year: int, year of the day
