@@ -1,3 +1,8 @@
+## Todos
+
+- [ ] standardize logging
+- [ ] support face detection for videos
+
 ## project structure
 
 see [this](https://cloud.google.com/functions/docs/writing/write-event-driven-functions)
