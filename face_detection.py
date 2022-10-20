@@ -7,6 +7,8 @@ import json
 from PIL import Image
 from io import BytesIO
 import piexif
+import functions_framework
+from datetime import datetime, timedelta
 
 TEST_BUCKET_NAME = "test-bucket-gpa"
 FACE_IMAGE_FILE_PREFIX = 'auto_detected_face_image_'
@@ -100,7 +102,7 @@ def read_exif_user_comment_from_image(file_path):
     exif_dict = piexif.load(image.info['exif'])
     return exif_dict['Exif'][piexif.ExifIFD.UserComment].decode('utf-8')
 
-def face_image_generation_for_google_photo(year, month, day):
+def face_image_generation_for_google_photo(year, month, day, dry_run=False):
     '''
     Generate face images for google photo for a given date.
     face images will be saved to a google photo album named 'auto_detected_face_images'
@@ -109,6 +111,9 @@ def face_image_generation_for_google_photo(year, month, day):
         month: 2 digits integer
         day: 2 digits integer
     '''
+    print('================== processing image from {}-{}-{} ======================'.format(year, month, day))
+    if dry_run:
+        return
     helper = GooglePhotoHelper()
     file_name_list = helper.upload_from_google_photo_to_bucket(year, month, day, TEST_BUCKET_NAME, dry_run=False, exclude_file_prefix=FACE_IMAGE_FILE_PREFIX)
     if not file_name_list:
@@ -117,8 +122,22 @@ def face_image_generation_for_google_photo(year, month, day):
     detection_result_file = async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, f'{year}_{month}_{day}_', vision_v1.Feature.Type.FACE_DETECTION)
     upload_face_detection_result(detection_result_file, TEST_BUCKET_NAME)
 
+
+# Triggered from a message on a Cloud Pub/Sub topic.
+@functions_framework.cloud_event
+def main(cloud_event):
+    # Print out the data from Pub/Sub, to prove that it worked
+    # print("Hello, " + base64.b64decode(cloud_event.data["message"]["data"]).decode() + "!")
+    # get the datetime of previous day:
+    target_day = datetime.now() - timedelta(days=3)
+    year = target_day.year
+    month = target_day.month
+    day = target_day.day
+    face_image_generation_for_google_photo(year, month, day, dry_run=True)
+# [END functions_cloudevent_pubsub]
+
 if __name__ == '__main__':
-    face_image_generation_for_google_photo(2022, 10, 19)
+    main(None)
     # upload_face_detection_result('2022_10_08_output-1-to-27.json', TEST_BUCKET_NAME, dry_run=False)                   
     
     # open image and read exif
