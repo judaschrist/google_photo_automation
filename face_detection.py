@@ -9,6 +9,7 @@ from io import BytesIO
 import piexif
 import functions_framework
 from datetime import datetime, timedelta
+import base64
 
 TEST_BUCKET_NAME = "test-bucket-gpa"
 FACE_IMAGE_FILE_PREFIX = 'auto_detected_face_image_'
@@ -134,6 +135,7 @@ def main(cloud_event):
     month = target_day.month
     day = target_day.day
     face_image_generation_for_google_photo(year, month, day, dry_run=True)
+    print("Hello, " + base64.b64decode(cloud_event.data["message"]["data"]).decode() + "!")
 # [END functions_cloudevent_pubsub]
 
 if __name__ == '__main__':
