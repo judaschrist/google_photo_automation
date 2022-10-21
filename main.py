@@ -139,6 +139,7 @@ def main(cloud_event: CloudEvent):
     face_image_generation_for_google_photo(year, month, day, dry_run=dry_run)
 
 
+# run this locally as an integrated test
 if __name__ == '__main__':
     msg = {
         "message": {
@@ -148,7 +149,6 @@ if __name__ == '__main__':
                             }).encode('utf-8'))
         }
     }
-    
     cloud_event = CloudEvent({
         "type": "test",
         "source": "local_test",

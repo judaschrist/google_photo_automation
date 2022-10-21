@@ -5,10 +5,22 @@ from google.auth.transport.requests import Request
 import requests
 import json
 import google_cloud_storage_api as cloud_api
+import google_crc32c
+from google.cloud import secretmanager
 
 
 CLIENT_SECRET_FILE = "secrets/google_photo_credentials.json"
 ADA_ALBUM_ID = "AKllbf1C1gz3LARx1H2d7xnY8Twr0ormAqs9E2QWMeBKOStro1qrXcezAxRBTTXkU-weB3N0WD7C"
+
+def get_api_credential_from_google_secret():
+    client = secretmanager.SecretManagerServiceClient()
+    name = "projects/1083696682843/secrets/google-photo-api-credential/versions/1"
+    response = client.access_secret_version(request={"name": name})
+    crc32c = google_crc32c.Checksum()
+    crc32c.update(response.payload.data)
+    if response.payload.data_crc32c != int(crc32c.hexdigest(), 16):
+        raise Exception("Secret data corruption detected.")
+    return response.payload.data.decode("UTF-8")
 
 class GooglePhotoHelper:
     '''
@@ -17,7 +29,6 @@ class GooglePhotoHelper:
 
     def __init__(self,
                  api_name = 'photoslibrary',
-                 client_secret_file=CLIENT_SECRET_FILE,
                  api_version = 'v1',
                  # change scopes according the use case
                  # see https://developers.google.com/photos/library/guides/authorization
@@ -27,14 +38,12 @@ class GooglePhotoHelper:
                 ]):
         '''
         Args:
-            client_secret_file: string, location where the requested credentials are saved
             api_version: string, the version of the service
             api_name: string, name of the api e.g."docs","photoslibrary",...
             api_version: version of the api
         '''
 
         self.api_name = api_name
-        self.client_secret_file = client_secret_file
         self.api_version = api_version
         self.scopes = scopes
         self.cred_pickle_file = f'token_{self.api_name}_{self.api_version}.pickle'
@@ -53,7 +62,8 @@ class GooglePhotoHelper:
             if self.cred and self.cred.expired and self.cred.refresh_token:
                 self.cred.refresh(Request())
             else:
-                flow = InstalledAppFlow.from_client_secrets_file(self.client_secret_file, self.scopes)
+                client_config = json.loads(get_api_credential_from_google_secret())
+                flow = InstalledAppFlow.from_client_config(client_config, self.scopes)
                 self.cred = flow.run_local_server()
 
             with open(self.cred_pickle_file, 'wb') as token:
@@ -235,7 +245,8 @@ class GooglePhotoHelper:
         return url_list
 
 if __name__ == '__main__':
-    helper = GooglePhotoHelper()
-    print(helper.list_face_download_urls_from_album(ADA_ALBUM_ID))
+    # helper = GooglePhotoHelper()
+    # print(helper.list_face_download_urls_from_album(ADA_ALBUM_ID))
+    print(get_api_credential_from_google_secret())
 
             
