@@ -60,24 +60,24 @@ class GooglePhotoHelper:
             self.cred = pickle.loads(get_api_credential_from_google_secret())
         except NotFound:
             self.cred = None
-        
+            print("!!! Make sure this is run locally first to create the pickle file, then upload it as a secret !!!")
+            print('************ upload the generated pickle file to your google secret and update the secret source id in CREDENTIAL_PICKLE_FILE_SECRET_SOURCE ************')
+
         # if there is no pickle file with stored credentials, create one using google_auth_oauthlib.flow
         if not self.cred or not self.cred.valid:
             if self.cred and self.cred.expired and self.cred.refresh_token:
-                print("Refreshing token")
+                print("=== Refreshing token ===")
                 self.cred.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, self.scopes)
                 self.cred = flow.run_local_server()
 
-            print("!!! Make sure this is run locally first to create the pickle file, then upload it as a secret !!!")
             with open(self.cred_pickle_file, 'wb') as token:
                 pickle.dump(self.cred, token)
-            print('************ upload the generated pickle file to your google secret and update the secret source id in CREDENTIAL_PICKLE_FILE_SECRET_SOURCE ************')
         
         return self.cred
 
-    def upload_from_google_photo_to_bucket(self, year, month, day, bucket_name, dry_run=False, exclude_file_prefix=None):
+    def upload_from_google_photo_to_bucket(self, year, month, day, bucket_name, upload_photo=True, upload_video=False, dry_run=False, exclude_file_prefix=None):
         '''
         Uploads all photos from a given day to a bucket
         Args:
@@ -125,16 +125,20 @@ class GooglePhotoHelper:
                 return []
             file_name_list = []
             for i, item in enumerate(res.json()['mediaItems']):
-                print(f"==== Uploading photo {i}: {item['filename']} ====")
                 if exclude_file_prefix is not None and item['filename'].startswith(exclude_file_prefix):
                     print(f"Skipping file {item['filename']}")
                     continue
                 base_url = item['baseUrl']
                 if 'photo' in item['mediaMetadata']:
+                    if not upload_photo:
+                        continue
                     base_url += '=d'
                 else:
+                    if not upload_video:
+                        continue
                     base_url += '=dv'
                 if not dry_run:
+                    print(f"==== Uploading photo {i}: {item['filename']} ====")
                     # preserving the original file name when uploading.
                     target_file_name = item['filename']
                     cloud_api.upload_url_to_google_cloud(base_url, target_file_name, item['mimeType'], bucket_name)

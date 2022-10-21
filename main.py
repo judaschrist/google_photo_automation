@@ -116,7 +116,7 @@ def face_image_generation_for_google_photo(year, month, day, dry_run=False):
     if dry_run:
         print('=== dry run mode ===')
     helper = GooglePhotoHelper()
-    file_name_list = helper.upload_from_google_photo_to_bucket(year, month, day, TEST_BUCKET_NAME, dry_run=dry_run, exclude_file_prefix=FACE_IMAGE_FILE_PREFIX)
+    file_name_list = helper.upload_from_google_photo_to_bucket(year, month, day, TEST_BUCKET_NAME, dry_run=dry_run, upload_photo=True, upload_video=False, exclude_file_prefix=FACE_IMAGE_FILE_PREFIX)
     if not file_name_list:
         print('No image found for {}-{}-{}'.format(year, month, day))
         return
