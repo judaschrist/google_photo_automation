@@ -165,3 +165,4 @@ def test_main():
 if __name__ == '__main__':
     # test_main()
     batch_process_photo()
+    # face_image_generation_for_google_photo(2021, 6, 24, dry_run=True)

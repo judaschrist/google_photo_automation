@@ -90,6 +90,11 @@ class GooglePhotoHelper:
         returns:
             A list of the file names that were uploaded
         '''
+        media_type_list = []
+        if upload_photo:
+            media_type_list.append('PHOTO')
+        if upload_video:
+            media_type_list.append('VIDEO')
         url = 'https://photoslibrary.googleapis.com/v1/mediaItems:search'
         payload = {
             "filters": {
@@ -103,6 +108,9 @@ class GooglePhotoHelper:
                         
                     ]
                 },
+                "mediaTypeFilter": {
+                    "mediaTypes": media_type_list
+                }
                 # TODO people filter does not work very well
                 # "contentFilter": {
                 #     "includedContentCategories": [
@@ -126,19 +134,14 @@ class GooglePhotoHelper:
             file_name_list = []
             for i, item in enumerate(res.json()['mediaItems']):
                 if exclude_file_prefix is not None and item['filename'].startswith(exclude_file_prefix):
-                    print(f"Skipping file {item['filename']}")
                     continue
                 base_url = item['baseUrl']
                 if 'photo' in item['mediaMetadata']:
-                    if not upload_photo:
-                        continue
                     base_url += '=d'
                 else:
-                    if not upload_video:
-                        continue
                     base_url += '=dv'
+                print(f"==== Uploading photo {i}: {item['filename']} ====")
                 if not dry_run:
-                    print(f"==== Uploading photo {i}: {item['filename']} ====")
                     # preserving the original file name when uploading.
                     target_file_name = item['filename']
                     cloud_api.upload_url_to_google_cloud(base_url, target_file_name, item['mimeType'], bucket_name)
