@@ -139,12 +139,18 @@ def main(cloud_event: CloudEvent):
     print("=================== PROCESS END FOR" + base64.b64decode(cloud_event.data["message"]["data"]).decode() + '=====================')
 
 
-# run this locally as an integrated test
-if __name__ == '__main__':
+def batch_process_photo():
+    # batch process photo
+    cur_date = datetime(2021, 6, 24)
+    while cur_date < datetime(2022, 10, 19):
+        face_image_generation_for_google_photo(cur_date.year, cur_date.month, cur_date.day)
+        cur_date += timedelta(days=1)
+
+def test_main():
     msg = {
         "message": {
             "data": base64.b64encode(json.dumps({
-                                "dry_run": False,
+                                "dry_run": True,
                                 "days_past": 3
                             }).encode('utf-8'))
         }
@@ -154,3 +160,8 @@ if __name__ == '__main__':
         "source": "local_test",
     }, msg)
     main(cloud_event)
+
+# run this locally as an integrated test
+if __name__ == '__main__':
+    # test_main()
+    batch_process_photo()
