@@ -58,9 +58,8 @@ def async_batch_annotate_images(
     return output_put_filename
 
 
-def upload_face_detection_result(detect_result_file_name, bucket_name, dry_run=False):
-    helper = GooglePhotoHelper()
-    album_id = helper.upsert_album(FACE_ALBUM_NAME)
+def upload_face_detection_result(photo_api_helper, detect_result_file_name, bucket_name, dry_run=False):
+    album_id = photo_api_helper.upsert_album(FACE_ALBUM_NAME)
     face_detection_result_json = json.loads(cloud_api.read_file_from_google_cloud_to_string(detect_result_file_name, bucket_name))
     for detection_res in face_detection_result_json['responses']:
         file_url = detection_res['context']['uri']
@@ -94,7 +93,7 @@ def upload_face_detection_result(detect_result_file_name, bucket_name, dry_run=F
                     face_crop.save(face_crop_bytes, format='JPEG', exif=exif_bytes)
                     # save the cropped image to album
                     print('\t\tUploading face {} of {}'.format(i, ori_file_name))
-                    helper.upload_image_to_photo_album(face_crop_bytes.getvalue(), f"{FACE_IMAGE_FILE_PREFIX}{image_creation_time}_{i}_{ori_file_name}", album_id)
+                    photo_api_helper.upload_image_to_photo_album(face_crop_bytes.getvalue(), f"{FACE_IMAGE_FILE_PREFIX}{image_creation_time}_{i}_{ori_file_name}", album_id)
                 else:
                     print(face['boundingPoly']['vertices'])
 
@@ -113,22 +112,22 @@ def face_image_generation_for_google_photo(year, month, day, dry_run=False):
         month: 2 digits integer
         day: 2 digits integer
     '''
-    print('================== processing image from {}-{}-{} ======================'.format(year, month, day))
+    print('======= processing image from {}-{}-{} ========'.format(year, month, day))
     if dry_run:
-        print('================== dry run mode ======================')
+        print('=== dry run mode ===')
     helper = GooglePhotoHelper()
     file_name_list = helper.upload_from_google_photo_to_bucket(year, month, day, TEST_BUCKET_NAME, dry_run=dry_run, exclude_file_prefix=FACE_IMAGE_FILE_PREFIX)
     if not file_name_list:
         print('No image found for {}-{}-{}'.format(year, month, day))
         return
     detection_result_file = async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, f'{year}_{month}_{day}_', vision_v1.Feature.Type.FACE_DETECTION)
-    upload_face_detection_result(detection_result_file, TEST_BUCKET_NAME)
+    upload_face_detection_result(helper, detection_result_file, TEST_BUCKET_NAME)
 
 
 # Triggered from a message on a Cloud Pub/Sub topic.
 @functions_framework.cloud_event
 def main(cloud_event: CloudEvent):
-    print("Hello, " + base64.b64decode(cloud_event.data["message"]["data"]).decode())
+    print("=================== PROCESS START FOR" + base64.b64decode(cloud_event.data["message"]["data"]).decode() + '=====================')
     msg_json = json.loads(base64.b64decode(cloud_event.data["message"]["data"]).decode())
     days_past = msg_json['days_past']
     dry_run = msg_json['dry_run']
@@ -137,6 +136,7 @@ def main(cloud_event: CloudEvent):
     month = target_day.month
     day = target_day.day
     face_image_generation_for_google_photo(year, month, day, dry_run=dry_run)
+    print("=================== PROCESS END FOR" + base64.b64decode(cloud_event.data["message"]["data"]).decode() + '=====================')
 
 
 # run this locally as an integrated test
@@ -144,7 +144,7 @@ if __name__ == '__main__':
     msg = {
         "message": {
             "data": base64.b64encode(json.dumps({
-                                "dry_run": True,
+                                "dry_run": False,
                                 "days_past": 3
                             }).encode('utf-8'))
         }

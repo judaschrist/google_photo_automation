@@ -1,11 +1,13 @@
 ## Todos
 
 - [ ] standardize logging
+- [ ] what if processing time exceeds the limited timeout?
 - [ ] support face detection for videos
+- [ ] script for automated deployment
 
 ## project structure
 
-see [this](https://cloud.google.com/functions/docs/writing/write-event-driven-functions)
+[Ref](https://cloud.google.com/functions/docs/writing/write-event-driven-functions)
 
 ## deploy
 
@@ -18,10 +20,11 @@ gcloud functions deploy google-photo-face-detection \
 --entry-point=main \
 --trigger-topic=recurring_jobs \
 --memory=512MiB \
---timeout=540
+--timeout=540 \
+--run-service-account="gpa-service@astute-maxim-365110.iam.gserviceaccount.com"
 ```
 
-see [this](https://cloud.google.com/functions/docs/tutorials/pubsub)
+see [all CLI flags](https://cloud.google.com/sdk/gcloud/reference/functions/deploy)
 
 
 ## test locally
@@ -35,4 +38,4 @@ read results in log:
 gcloud beta functions logs read google-photo-face-detection --gen2
 ```
 
-see [this](https://cloud.google.com/functions/docs/tutorials/pubsub#triggering_the_function)
+[Ref](https://cloud.google.com/functions/docs/tutorials/pubsub#triggering_the_function)

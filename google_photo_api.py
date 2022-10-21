@@ -7,20 +7,23 @@ import json
 import google_cloud_storage_api as cloud_api
 import google_crc32c
 from google.cloud import secretmanager
+from google.api_core.exceptions import NotFound
 
 
 CLIENT_SECRET_FILE = "secrets/google_photo_credentials.json"
 ADA_ALBUM_ID = "AKllbf1C1gz3LARx1H2d7xnY8Twr0ormAqs9E2QWMeBKOStro1qrXcezAxRBTTXkU-weB3N0WD7C"
+CREDENTIAL_PICKLE_FILE_SECRET_SOURCE = "projects/1083696682843/secrets/google-photo-api-credential-pickle/versions/2"
 
 def get_api_credential_from_google_secret():
+    # loads of setup to do, see: https://cloud.google.com/secret-manager/docs/creating-and-accessing-secrets
     client = secretmanager.SecretManagerServiceClient()
-    name = "projects/1083696682843/secrets/google-photo-api-credential/versions/1"
-    response = client.access_secret_version(request={"name": name})
+    # remember to upload your own pickle file to google secret manager!!
+    response = client.access_secret_version(request={"name": CREDENTIAL_PICKLE_FILE_SECRET_SOURCE})
     crc32c = google_crc32c.Checksum()
     crc32c.update(response.payload.data)
     if response.payload.data_crc32c != int(crc32c.hexdigest(), 16):
         raise Exception("Secret data corruption detected.")
-    return response.payload.data.decode("UTF-8")
+    return response.payload.data
 
 class GooglePhotoHelper:
     '''
@@ -53,21 +56,24 @@ class GooglePhotoHelper:
 
     def run_local_server(self):
         # checking if there is already a pickle file with relevant credentials
-        if os.path.exists(self.cred_pickle_file):
-            with open(self.cred_pickle_file, 'rb') as token:
-                self.cred = pickle.load(token)
-
+        try:
+            self.cred = pickle.loads(get_api_credential_from_google_secret())
+        except NotFound:
+            self.cred = None
+        
         # if there is no pickle file with stored credentials, create one using google_auth_oauthlib.flow
         if not self.cred or not self.cred.valid:
             if self.cred and self.cred.expired and self.cred.refresh_token:
+                print("Refreshing token")
                 self.cred.refresh(Request())
             else:
-                client_config = json.loads(get_api_credential_from_google_secret())
-                flow = InstalledAppFlow.from_client_config(client_config, self.scopes)
+                flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, self.scopes)
                 self.cred = flow.run_local_server()
 
+            print("!!! Make sure this is run locally first to create the pickle file, then upload it as a secret !!!")
             with open(self.cred_pickle_file, 'wb') as token:
                 pickle.dump(self.cred, token)
+            print('************ upload the generated pickle file to your google secret and update the secret source id in CREDENTIAL_PICKLE_FILE_SECRET_SOURCE ************')
         
         return self.cred
 
