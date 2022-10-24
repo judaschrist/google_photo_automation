@@ -11,6 +11,7 @@ import functions_framework
 from datetime import datetime, timedelta
 import base64
 from cloudevents.http.event import CloudEvent
+from google_logging import structured_log, LogSeverity
 
 TEST_BUCKET_NAME = "test-bucket-gpa"
 FACE_IMAGE_FILE_PREFIX = 'auto_detected_face_image_'
@@ -47,14 +48,13 @@ def async_batch_annotate_images(
     operation = client.async_batch_annotate_images(requests=requests, output_config=output_config)
 
     # TODO deal with timeout cases
-    print("Waiting for operation to complete...")
+    structured_log("Waiting for operation to complete...")
     response = operation.result(300)
 
     # The output is written to GCS with the provided output_uri as prefix
-    gcs_output_uri = response.output_config.gcs_destination.uri
     output_put_filename = f"{output_file_prefix}output-1-to-{batch_size}.json"
 
-    print("Output written to GCS with file name: {}".format(output_put_filename))
+    structured_log("Output written to GCS with file name: {}".format(output_put_filename))
     return output_put_filename
 
 
@@ -67,14 +67,14 @@ def upload_face_detection_result(photo_api_helper, detect_result_file_name, buck
         if 'error' in detection_res:
             continue
         if 'faceAnnotations' in detection_res:
-            print('======== Found {} faces in {}'.format(len(detection_res['faceAnnotations']), ori_file_name))
+            structured_log('======== Found {} faces in {}'.format(len(detection_res['faceAnnotations']), ori_file_name))
             image = Image.open(BytesIO(cloud_api.read_file_from_gs_url_to_bytes(file_url)))
             # get image creation time
             try:
                 exif_dict = piexif.load(image.info['exif'])
             except KeyError:
                 # some images does not have proper exif data altogether
-                print('!!! No exif data found for {}, skipping!!!'.format(ori_file_name))
+                structured_log('!!! No exif data found for {}, skipping!!!'.format(ori_file_name), severity=LogSeverity.NOTICE)
                 continue
             if exif_dict and piexif.ExifIFD.DateTimeOriginal in exif_dict['Exif']:
                 image_creation_time = exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal][:10].decode('utf-8')
@@ -97,10 +97,10 @@ def upload_face_detection_result(photo_api_helper, detect_result_file_name, buck
                     face_crop_bytes = BytesIO()
                     face_crop.save(face_crop_bytes, format='JPEG', exif=exif_bytes)
                     # save the cropped image to album
-                    print('\t\tUploading face {} of {}'.format(i, ori_file_name))
+                    structured_log('Uploading face {} of {}'.format(i, ori_file_name))
                     photo_api_helper.upload_image_to_photo_album(face_crop_bytes.getvalue(), f"{FACE_IMAGE_FILE_PREFIX}{image_creation_time}_{i}_{ori_file_name}", album_id)
                 else:
-                    print(face['boundingPoly']['vertices'])
+                    structured_log(face['boundingPoly']['vertices'])
 
 
 def read_exif_user_comment_from_image(file_path):
@@ -117,13 +117,13 @@ def face_image_generation_for_google_photo(year, month, day, dry_run=False):
         month: 2 digits integer
         day: 2 digits integer
     '''
-    print('======= processing image from {}-{}-{} ========'.format(year, month, day))
+    structured_log('======= processing image from {}-{}-{} ========'.format(year, month, day))
     if dry_run:
-        print('=== dry run mode ===')
+        structured_log('=== dry run mode ===')
     helper = GooglePhotoHelper()
     file_name_list = helper.upload_from_google_photo_to_bucket(year, month, day, TEST_BUCKET_NAME, dry_run=dry_run, upload_photo=True, upload_video=False, exclude_file_prefix=FACE_IMAGE_FILE_PREFIX)
     if not file_name_list:
-        print('No image found for {}-{}-{}'.format(year, month, day))
+        structured_log('No image found for {}-{}-{}'.format(year, month, day))
         return
     detection_result_file = async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, f'{year}_{month}_{day}_', vision_v1.Feature.Type.FACE_DETECTION)
     upload_face_detection_result(helper, detection_result_file, TEST_BUCKET_NAME)
@@ -132,7 +132,7 @@ def face_image_generation_for_google_photo(year, month, day, dry_run=False):
 # Triggered from a message on a Cloud Pub/Sub topic.
 @functions_framework.cloud_event
 def main(cloud_event: CloudEvent):
-    print("=================== PROCESS START FOR" + base64.b64decode(cloud_event.data["message"]["data"]).decode() + '=====================')
+    structured_log("=================== PROCESS START FOR" + base64.b64decode(cloud_event.data["message"]["data"]).decode() + '=====================')
     msg_json = json.loads(base64.b64decode(cloud_event.data["message"]["data"]).decode())
     days_past = msg_json['days_past']
     dry_run = msg_json['dry_run']
@@ -141,12 +141,12 @@ def main(cloud_event: CloudEvent):
     month = target_day.month
     day = target_day.day
     face_image_generation_for_google_photo(year, month, day, dry_run=dry_run)
-    print("=================== PROCESS END FOR" + base64.b64decode(cloud_event.data["message"]["data"]).decode() + '=====================')
+    structured_log("=================== PROCESS END FOR" + base64.b64decode(cloud_event.data["message"]["data"]).decode() + '=====================')
 
 
 def batch_process_photo():
     # batch process photo
-    cur_date = datetime(2021, 7, 1)
+    cur_date = datetime(2021, 7, 3)
     while cur_date < datetime(2022, 8, 22):
         face_image_generation_for_google_photo(cur_date.year, cur_date.month, cur_date.day)
         cur_date += timedelta(days=1)

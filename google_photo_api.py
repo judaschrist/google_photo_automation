@@ -1,5 +1,4 @@
 import pickle
-import os
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import requests
@@ -8,6 +7,7 @@ import google_cloud_storage_api as cloud_api
 import google_crc32c
 from google.cloud import secretmanager
 from google.api_core.exceptions import NotFound
+from google_logging import structured_log, LogSeverity
 
 
 CLIENT_SECRET_FILE = "secrets/google_photo_credentials.json"
@@ -60,13 +60,13 @@ class GooglePhotoHelper:
             self.cred = pickle.loads(get_api_credential_from_google_secret())
         except NotFound:
             self.cred = None
-            print("!!! Make sure this is run locally first to create the pickle file, then upload it as a secret !!!")
-            print('************ upload the generated pickle file to your google secret and update the secret source id in CREDENTIAL_PICKLE_FILE_SECRET_SOURCE ************')
+            structured_log("!!! Make sure this is run locally first to create the pickle file, then upload it as a secret !!!", severity=LogSeverity.WARNING)
+            structured_log('************ upload the generated pickle file to your google secret and update the secret source id in CREDENTIAL_PICKLE_FILE_SECRET_SOURCE ************', severity=LogSeverity.WARNING)
 
         # if there is no pickle file with stored credentials, create one using google_auth_oauthlib.flow
         if not self.cred or not self.cred.valid:
             if self.cred and self.cred.expired and self.cred.refresh_token:
-                print("=== Refreshing token ===")
+                structured_log("=== Refreshing token ===")
                 self.cred.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, self.scopes)
@@ -127,29 +127,25 @@ class GooglePhotoHelper:
         }
         
         res = requests.request("POST", url, data=json.dumps(payload), headers=headers)
-        try:
-            if 'mediaItems' not in res.json():
-                print("No media items found")
-                return []
-            file_name_list = []
-            for i, item in enumerate(res.json()['mediaItems']):
-                if exclude_file_prefix is not None and item['filename'].startswith(exclude_file_prefix):
-                    continue
-                base_url = item['baseUrl']
-                if 'photo' in item['mediaMetadata']:
-                    base_url += '=d'
-                else:
-                    base_url += '=dv'
-                print(f"==== Uploading photo {i}: {item['filename']} ====")
-                if not dry_run:
-                    # preserving the original file name when uploading.
-                    target_file_name = item['filename']
-                    cloud_api.upload_url_to_google_cloud(base_url, target_file_name, item['mimeType'], bucket_name)
-                    file_name_list.append(target_file_name)
-            return file_name_list
-        except Exception as e:
-            print(res.json())
-            raise e
+        if 'mediaItems' not in res.json():
+            structured_log("No media items found")
+            return []
+        file_name_list = []
+        for i, item in enumerate(res.json()['mediaItems']):
+            if exclude_file_prefix is not None and item['filename'].startswith(exclude_file_prefix):
+                continue
+            base_url = item['baseUrl']
+            if 'photo' in item['mediaMetadata']:
+                base_url += '=d'
+            else:
+                base_url += '=dv'
+            structured_log(f"==== Uploading photo {i}: {item['filename']} ====")
+            if not dry_run:
+                # preserving the original file name when uploading.
+                target_file_name = item['filename']
+                cloud_api.upload_url_to_google_cloud(base_url, target_file_name, item['mimeType'], bucket_name)
+                file_name_list.append(target_file_name)
+        return file_name_list
 
     def upload_image_to_photo_album(self, image_bytes, file_name, album_id):
         '''
