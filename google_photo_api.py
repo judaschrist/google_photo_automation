@@ -2,12 +2,14 @@ import pickle
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import requests
+from requests.exceptions import ConnectionError
 import json
 import google_cloud_storage_api as cloud_api
 import google_crc32c
 from google.cloud import secretmanager
 from google.api_core.exceptions import NotFound
 from google_logging import structured_log, LogSeverity
+import time
 
 
 CLIENT_SECRET_FILE = "secrets/google_photo_credentials.json"
@@ -147,7 +149,7 @@ class GooglePhotoHelper:
                 file_name_list.append(target_file_name)
         return file_name_list
 
-    def upload_image_to_photo_album(self, image_bytes, file_name, album_id):
+    def upload_image_to_photo_album(self, image_bytes, file_name, album_id, retry=3):
         '''
         Uploads an image to a photo album
         Args:
@@ -159,9 +161,24 @@ class GooglePhotoHelper:
             'content-type': 'application/octet-stream',
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
-        res = requests.request("POST", url, data=image_bytes, headers=headers)
-        # get the upload token as a string
-        upload_token = res.content.decode('utf-8')
+        num_requests_tried = 0
+        while num_requests_tried < retry:
+            try:
+                res = requests.request("POST", url, data=image_bytes, headers=headers)
+                # get the upload token as a string
+                upload_token = res.content.decode('utf-8')
+                break
+            except ConnectionError as e:
+                structured_log(f"Failed to upload image to google photo, retrying... {e}", severity=LogSeverity.WARNING)
+                num_requests_tried += 1
+                # wait for 1 second before retrying
+                time.sleep(1)
+        
+        if num_requests_tried == retry:
+            structured_log(f"Failed to upload image to google photo after {retry} retries", severity=LogSeverity.ERROR)
+            return
+        
+
         url = 'https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate'
         payload = {
             "albumId": album_id,
@@ -179,7 +196,7 @@ class GooglePhotoHelper:
             'content-type': 'application/json',
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
-        res = requests.request("POST", url, data=json.dumps(payload), headers=headers)
+        requests.request("POST", url, data=json.dumps(payload), headers=headers)
 
     def create_new_album(self, album_name):
         '''

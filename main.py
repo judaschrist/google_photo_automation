@@ -146,7 +146,7 @@ def main(cloud_event: CloudEvent):
 
 def batch_process_photo():
     # batch process photo
-    cur_date = datetime(2021, 7, 3)
+    cur_date = datetime(2021, 7, 5)
     while cur_date < datetime(2022, 8, 22):
         face_image_generation_for_google_photo(cur_date.year, cur_date.month, cur_date.day)
         cur_date += timedelta(days=1)
@@ -172,4 +172,4 @@ if __name__ == '__main__':
     batch_process_photo()
     # face_image_generation_for_google_photo(2021, 6, 24, dry_run=True)
     # helper = GooglePhotoHelper()
-    # upload_face_detection_result(helper, '2021_6_30_output-1-to-14.json', TEST_BUCKET_NAME)
+    # upload_face_detection_result(helper, '2021_7_4_output-1-to-18.json', TEST_BUCKET_NAME)
