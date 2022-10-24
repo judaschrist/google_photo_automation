@@ -144,9 +144,9 @@ def main(cloud_event: CloudEvent):
     structured_log("=================== PROCESS END FOR" + base64.b64decode(cloud_event.data["message"]["data"]).decode() + '=====================')
 
 
-def batch_process_photo():
+def batch_process_photo(year, month, day):
     # batch process photo
-    cur_date = datetime(2021, 7, 5)
+    cur_date = datetime(year, month, day)
     while cur_date < datetime(2022, 8, 22):
         face_image_generation_for_google_photo(cur_date.year, cur_date.month, cur_date.day)
         cur_date += timedelta(days=1)
@@ -169,7 +169,8 @@ def test_main():
 # run this locally as an integrated test
 if __name__ == '__main__':
     # test_main()
-    batch_process_photo()
     # face_image_generation_for_google_photo(2021, 6, 24, dry_run=True)
-    # helper = GooglePhotoHelper()
-    # upload_face_detection_result(helper, '2021_7_4_output-1-to-18.json', TEST_BUCKET_NAME)
+    helper = GooglePhotoHelper()
+    upload_face_detection_result(helper, '2021_7_13_output-1-to-15.json', TEST_BUCKET_NAME)
+    batch_process_photo(2021, 7, 14)
+

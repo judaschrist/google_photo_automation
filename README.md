@@ -1,8 +1,9 @@
 ## Todos
 
-- [ ] standardize logging
+- [X] standardize logging
 - [ ] what if processing time exceeds the limited timeout?
 - [ ] support face detection for videos
+- [ ] instruction for deployment
 - [ ] script for automated deployment
 
 ## project structure

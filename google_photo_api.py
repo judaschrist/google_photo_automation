@@ -1,3 +1,4 @@
+from ast import Raise
 import pickle
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -9,8 +10,7 @@ import google_crc32c
 from google.cloud import secretmanager
 from google.api_core.exceptions import NotFound
 from google_logging import structured_log, LogSeverity
-import time
-
+from retrying import retry
 
 CLIENT_SECRET_FILE = "secrets/google_photo_credentials.json"
 ADA_ALBUM_ID = "AKllbf1C1gz3LARx1H2d7xnY8Twr0ormAqs9E2QWMeBKOStro1qrXcezAxRBTTXkU-weB3N0WD7C"
@@ -26,6 +26,9 @@ def get_api_credential_from_google_secret():
     if response.payload.data_crc32c != int(crc32c.hexdigest(), 16):
         raise Exception("Secret data corruption detected.")
     return response.payload.data
+
+def retry_if_connection_error(exception):
+    return isinstance(exception, ConnectionError)
 
 class GooglePhotoHelper:
     '''
@@ -149,7 +152,8 @@ class GooglePhotoHelper:
                 file_name_list.append(target_file_name)
         return file_name_list
 
-    def upload_image_to_photo_album(self, image_bytes, file_name, album_id, retry=3):
+    @retry(retry_on_exception=retry_if_connection_error, wait_fixed=500, stop_max_attempt_number=4, wrap_exception=True)
+    def upload_image_to_photo_album(self, image_bytes, file_name, album_id):
         '''
         Uploads an image to a photo album
         Args:
@@ -161,24 +165,9 @@ class GooglePhotoHelper:
             'content-type': 'application/octet-stream',
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
-        num_requests_tried = 0
-        while num_requests_tried < retry:
-            try:
-                res = requests.request("POST", url, data=image_bytes, headers=headers)
-                # get the upload token as a string
-                upload_token = res.content.decode('utf-8')
-                break
-            except ConnectionError as e:
-                structured_log(f"Failed to upload image to google photo, retrying... {e}", severity=LogSeverity.WARNING)
-                num_requests_tried += 1
-                # wait for 1 second before retrying
-                time.sleep(1)
-        
-        if num_requests_tried == retry:
-            structured_log(f"Failed to upload image to google photo after {retry} retries", severity=LogSeverity.ERROR)
-            return
-        
-
+        res = requests.request("POST", url, data=image_bytes, headers=headers)
+        # get the upload token as a string
+        upload_token = res.content.decode('utf-8')
         url = 'https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate'
         payload = {
             "albumId": album_id,
@@ -273,6 +262,19 @@ class GooglePhotoHelper:
 if __name__ == '__main__':
     # helper = GooglePhotoHelper()
     # print(helper.list_face_download_urls_from_album(ADA_ALBUM_ID))
-    print(get_api_credential_from_google_secret())
+    # print(get_api_credential_from_google_secret())
+
+    import random
+    from retrying import retry
+
+    @retry(wait_fixed=1000, stop_max_attempt_number=3, wrap_exception=True)
+    def do_something_unreliable():
+        if random.randint(0, 10) > 1:
+            print('wrong!')
+            raise IOError("Broken sauce, everything is hosed!!!111one")
+        else:
+            return "Awesome sauce!"
+
+    print(do_something_unreliable())
 
             
