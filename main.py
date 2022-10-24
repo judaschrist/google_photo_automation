@@ -70,7 +70,12 @@ def upload_face_detection_result(photo_api_helper, detect_result_file_name, buck
             print('======== Found {} faces in {}'.format(len(detection_res['faceAnnotations']), ori_file_name))
             image = Image.open(BytesIO(cloud_api.read_file_from_gs_url_to_bytes(file_url)))
             # get image creation time
-            exif_dict = piexif.load(image.info['exif'])
+            try:
+                exif_dict = piexif.load(image.info['exif'])
+            except KeyError:
+                # some images does not have proper exif data altogether
+                print('!!! No exif data found for {}, skipping!!!'.format(ori_file_name))
+                continue
             if exif_dict and piexif.ExifIFD.DateTimeOriginal in exif_dict['Exif']:
                 image_creation_time = exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal][:10].decode('utf-8')
             else:
@@ -141,8 +146,8 @@ def main(cloud_event: CloudEvent):
 
 def batch_process_photo():
     # batch process photo
-    cur_date = datetime(2021, 6, 24)
-    while cur_date < datetime(2022, 10, 19):
+    cur_date = datetime(2021, 7, 1)
+    while cur_date < datetime(2022, 8, 22):
         face_image_generation_for_google_photo(cur_date.year, cur_date.month, cur_date.day)
         cur_date += timedelta(days=1)
 
@@ -166,3 +171,5 @@ if __name__ == '__main__':
     # test_main()
     batch_process_photo()
     # face_image_generation_for_google_photo(2021, 6, 24, dry_run=True)
+    # helper = GooglePhotoHelper()
+    # upload_face_detection_result(helper, '2021_6_30_output-1-to-14.json', TEST_BUCKET_NAME)
