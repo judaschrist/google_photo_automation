@@ -170,7 +170,7 @@ def test_main():
 if __name__ == '__main__':
     # test_main()
     # face_image_generation_for_google_photo(2021, 6, 24, dry_run=True)
-    helper = GooglePhotoHelper()
-    upload_face_detection_result(helper, '2021_7_13_output-1-to-15.json', TEST_BUCKET_NAME)
-    batch_process_photo(2021, 7, 14)
+    # helper = GooglePhotoHelper()
+    # upload_face_detection_result(helper, '2021_7_13_output-1-to-15.json', TEST_BUCKET_NAME)
+    batch_process_photo(2021, 8, 17)
 
