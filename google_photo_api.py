@@ -29,6 +29,10 @@ def get_api_credential_from_google_secret():
 def retry_if_connection_error(exception):
     return isinstance(exception, ConnectionError)
 
+@retry(retry_on_exception=retry_if_connection_error, wait_fixed=500, stop_max_attempt_number=3, wrap_exception=True)
+def safe_retryable_requests(*args, **kwargs):
+    return requests.request(*args, **kwargs)
+
 class GooglePhotoHelper:
     '''
     Helper class to manage medias files in Google Photo
@@ -130,7 +134,7 @@ class GooglePhotoHelper:
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
         
-        res = requests.request("POST", url, data=json.dumps(payload), headers=headers)
+        res = safe_retryable_requests("POST", url, data=json.dumps(payload), headers=headers)
         if 'mediaItems' not in res.json():
             structured_log("No media items found")
             return []
@@ -152,7 +156,6 @@ class GooglePhotoHelper:
                 file_name_list.append(target_file_name)
         return file_name_list
 
-    @retry(retry_on_exception=retry_if_connection_error, wait_fixed=500, stop_max_attempt_number=4, wrap_exception=True)
     def upload_image_to_photo_album(self, image_bytes, file_name, album_id):
         '''
         Uploads an image to a photo album
@@ -165,7 +168,7 @@ class GooglePhotoHelper:
             'content-type': 'application/octet-stream',
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
-        res = requests.request("POST", url, data=image_bytes, headers=headers)
+        res = safe_retryable_requests("POST", url, data=image_bytes, headers=headers)
         # get the upload token as a string
         upload_token = res.content.decode('utf-8')
         url = 'https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate'
@@ -185,7 +188,7 @@ class GooglePhotoHelper:
             'content-type': 'application/json',
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
-        requests.request("POST", url, data=json.dumps(payload), headers=headers)
+        safe_retryable_requests("POST", url, data=json.dumps(payload), headers=headers)
 
     def create_new_album(self, album_name):
         '''
@@ -203,7 +206,7 @@ class GooglePhotoHelper:
             'content-type': 'application/json',
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
-        res = requests.request("POST", url, data=json.dumps(payload), headers=headers)
+        res = safe_retryable_requests("POST", url, data=json.dumps(payload), headers=headers)
         return res.json()['id']
     
     def find_albums_by_name(self, album_name):
@@ -217,7 +220,7 @@ class GooglePhotoHelper:
             'content-type': 'application/json',
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
-        res = requests.request("GET", url, headers=headers)
+        res = safe_retryable_requests("GET", url, headers=headers)
         albums = res.json()['albums']
         return [album for album in albums if album['title'] == album_name]
 
@@ -250,7 +253,7 @@ class GooglePhotoHelper:
             'content-type': 'application/json',
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
-        res = requests.request("POST", url, data=json.dumps(payload), headers=headers)
+        res = safe_retryable_requests("POST", url, data=json.dumps(payload), headers=headers)
         url_list = []
         for item in res.json()['mediaItems']:
             if item['filename'].startswith('auto_detected_face_image_'):
