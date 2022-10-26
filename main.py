@@ -1,8 +1,9 @@
+from turtle import st
 from typing import List
 
 from google_photo_api import GooglePhotoHelper
 from google.cloud import vision_v1
-import google_cloud_storage_api as cloud_api
+from google_cloud_storage_api import GoogleStorageHelper
 import json
 from PIL import Image
 from io import BytesIO
@@ -59,8 +60,9 @@ def async_batch_annotate_images(
 
 
 def upload_face_detection_result(photo_api_helper, detect_result_file_name, bucket_name, dry_run=False):
+    storage_helper = GoogleStorageHelper(bucket_name)
     album_id = photo_api_helper.upsert_album(FACE_ALBUM_NAME)
-    face_detection_result_json = json.loads(cloud_api.read_file_from_google_cloud_to_string(detect_result_file_name, bucket_name))
+    face_detection_result_json = json.loads(storage_helper.read_file_from_google_cloud_to_string(detect_result_file_name))
     for detection_res in face_detection_result_json['responses']:
         file_url = detection_res['context']['uri']
         ori_file_name = file_url.split('/')[-1]
@@ -68,7 +70,7 @@ def upload_face_detection_result(photo_api_helper, detect_result_file_name, buck
             continue
         if 'faceAnnotations' in detection_res:
             structured_log('======== Found {} faces in {}'.format(len(detection_res['faceAnnotations']), ori_file_name))
-            image = Image.open(BytesIO(cloud_api.read_file_from_gs_url_to_bytes(file_url)))
+            image = Image.open(BytesIO(storage_helper.read_file_from_google_cloud_to_bytes(ori_file_name)))
             # get image creation time
             try:
                 exif_dict = piexif.load(image.info['exif'])
@@ -147,7 +149,7 @@ def main(cloud_event: CloudEvent):
 def batch_process_photo(year, month, day):
     # batch process photo
     cur_date = datetime(year, month, day)
-    while cur_date < datetime(2022, 8, 22):
+    while cur_date < datetime(2022, 4, 25):
         face_image_generation_for_google_photo(cur_date.year, cur_date.month, cur_date.day)
         cur_date += timedelta(days=1)
 
@@ -171,6 +173,6 @@ if __name__ == '__main__':
     # test_main()
     # face_image_generation_for_google_photo(2021, 6, 24, dry_run=True)
     # helper = GooglePhotoHelper()
-    # upload_face_detection_result(helper, '2021_7_13_output-1-to-15.json', TEST_BUCKET_NAME)
-    batch_process_photo(2021, 8, 17)
+    # upload_face_detection_result(helper, '2021_10_17_output-1-to-37.json', TEST_BUCKET_NAME)
+    batch_process_photo(2021, 10, 18)
 

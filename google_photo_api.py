@@ -1,11 +1,10 @@
-from ast import Raise
 import pickle
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import requests
 from requests.exceptions import ConnectionError
 import json
-import google_cloud_storage_api as cloud_api
+from google_cloud_storage_api import GoogleStorageHelper
 import google_crc32c
 from google.cloud import secretmanager
 from google.api_core.exceptions import NotFound
@@ -136,6 +135,7 @@ class GooglePhotoHelper:
             structured_log("No media items found")
             return []
         file_name_list = []
+        storage_api = GoogleStorageHelper(bucket_name)
         for i, item in enumerate(res.json()['mediaItems']):
             if exclude_file_prefix is not None and item['filename'].startswith(exclude_file_prefix):
                 continue
@@ -148,7 +148,7 @@ class GooglePhotoHelper:
             if not dry_run:
                 # preserving the original file name when uploading.
                 target_file_name = item['filename']
-                cloud_api.upload_url_to_google_cloud(base_url, target_file_name, item['mimeType'], bucket_name)
+                storage_api.upload_url_to_google_cloud(base_url, target_file_name, item['mimeType'])
                 file_name_list.append(target_file_name)
         return file_name_list
 
