@@ -1,4 +1,3 @@
-from turtle import st
 from typing import List
 
 from google_photo_api import GooglePhotoHelper
