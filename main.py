@@ -173,5 +173,5 @@ if __name__ == '__main__':
     # face_image_generation_for_google_photo(2021, 6, 24, dry_run=True)
     # helper = GooglePhotoHelper()
     # upload_face_detection_result(helper, '2021_10_17_output-1-to-37.json', TEST_BUCKET_NAME)
-    batch_process_photo(2021, 10, 18)
+    batch_process_photo(2021, 11, 25)
 

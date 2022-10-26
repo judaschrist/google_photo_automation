@@ -12,7 +12,6 @@ from google_logging import structured_log, LogSeverity
 from retrying import retry
 
 CLIENT_SECRET_FILE = "secrets/google_photo_credentials.json"
-ADA_ALBUM_ID = "AKllbf1C1gz3LARx1H2d7xnY8Twr0ormAqs9E2QWMeBKOStro1qrXcezAxRBTTXkU-weB3N0WD7C"
 CREDENTIAL_PICKLE_FILE_SECRET_SOURCE = "projects/1083696682843/secrets/google-photo-api-credential-pickle/versions/2"
 
 def get_api_credential_from_google_secret():
@@ -239,45 +238,45 @@ class GooglePhotoHelper:
             raise Exception('More than one album found, please delete all albums with the name of {}'.format(album_name))
         return album_id
 
-    def list_face_download_urls_from_album(self, album_id, page_size=10):
+    def list_face_download_urls_from_album(self, album_id, size=100):
         '''
-        Lists all the base urls of the images in an album
+        Lists all the base urls of the face images in an album
         Args:
             album_id: string, id of the album
         '''
         url = 'https://photoslibrary.googleapis.com/v1/mediaItems:search'
         payload = {
-            "albumId": album_id
+            "albumId": album_id,
+            "pageSize": 100
         }
         headers = {
             'content-type': 'application/json',
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
-        res = safe_retryable_requests("POST", url, data=json.dumps(payload), headers=headers)
+        next_page_token = None
         url_list = []
-        for item in res.json()['mediaItems']:
-            if item['filename'].startswith('auto_detected_face_image_'):
-                url_list.append(item['baseUrl'] + '=d')
-                if len(url_list) == page_size:
-                    break
+        while True:
+            if next_page_token is not None:
+                payload['pageToken'] = next_page_token
+            res = safe_retryable_requests("POST", url, data=json.dumps(payload), headers=headers)
+            for item in res.json()['mediaItems']:
+                if item['filename'].startswith('auto_detected_face_image_'):
+                    url_list.append(item['baseUrl'] + '=d')
+                    if len(url_list) == size:
+                        break
+            next_page_token = res.json().get('nextPageToken')
+            if next_page_token is None or len(url_list) == size:
+                break
         return url_list
 
 if __name__ == '__main__':
-    # helper = GooglePhotoHelper()
-    # print(helper.list_face_download_urls_from_album(ADA_ALBUM_ID))
+    helper = GooglePhotoHelper()
+    album_list = helper.find_albums_by_name('Ada')
+    print(album_list)
+    url_list = helper.list_face_download_urls_from_album(album_list[0]['id'], size=200)
+    print(len(url_list))
     # print(get_api_credential_from_google_secret())
 
-    import random
-    from retrying import retry
 
-    @retry(wait_fixed=1000, stop_max_attempt_number=3, wrap_exception=True)
-    def do_something_unreliable():
-        if random.randint(0, 10) > 1:
-            print('wrong!')
-            raise IOError("Broken sauce, everything is hosed!!!111one")
-        else:
-            return "Awesome sauce!"
-
-    print(do_something_unreliable())
 
             
