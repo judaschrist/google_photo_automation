@@ -58,7 +58,7 @@ def async_batch_annotate_images(
     return output_put_filename
 
 
-def upload_face_detection_result(photo_api_helper, detect_result_file_name, bucket_name, dry_run=False):
+def upload_face_detection_result(photo_api_helper, detect_result_file_name, file_name_dict, bucket_name, dry_run=False):
     storage_helper = GoogleStorageHelper(bucket_name)
     album_id = photo_api_helper.upsert_album(FACE_ALBUM_NAME)
     face_detection_result_json = json.loads(storage_helper.read_file_from_google_cloud_to_string(detect_result_file_name))
@@ -69,7 +69,7 @@ def upload_face_detection_result(photo_api_helper, detect_result_file_name, buck
             continue
         if 'faceAnnotations' in detection_res:
             structured_log('======== Found {} faces in {}'.format(len(detection_res['faceAnnotations']), ori_file_name))
-            image = Image.open(BytesIO(storage_helper.read_file_from_google_cloud_to_bytes(ori_file_name)))
+            image = Image.open(BytesIO(file_name_dict[ori_file_name]))
             # get image creation time
             try:
                 exif_dict = piexif.load(image.info['exif'])
@@ -122,12 +122,12 @@ def face_image_generation_for_google_photo(year, month, day, dry_run=False):
     if dry_run:
         structured_log('=== dry run mode ===')
     helper = GooglePhotoHelper()
-    file_name_list = helper.upload_from_google_photo_to_bucket(year, month, day, TEST_BUCKET_NAME, dry_run=dry_run, upload_photo=True, upload_video=False, exclude_file_prefix=FACE_IMAGE_FILE_PREFIX)
-    if not file_name_list:
+    file_name_dict = helper.upload_from_google_photo_to_bucket(year, month, day, TEST_BUCKET_NAME, dry_run=dry_run, upload_photo=True, upload_video=False, exclude_file_prefix=FACE_IMAGE_FILE_PREFIX)
+    if not file_name_dict:
         structured_log('No image found for {}-{}-{}'.format(year, month, day))
         return
-    detection_result_file = async_batch_annotate_images(TEST_BUCKET_NAME, file_name_list, f'{year}_{month}_{day}_', vision_v1.Feature.Type.FACE_DETECTION)
-    upload_face_detection_result(helper, detection_result_file, TEST_BUCKET_NAME)
+    detection_result_file = async_batch_annotate_images(TEST_BUCKET_NAME, file_name_dict.keys(), f'{year}_{month}_{day}_', vision_v1.Feature.Type.FACE_DETECTION)
+    upload_face_detection_result(helper, detection_result_file, file_name_dict, TEST_BUCKET_NAME)
 
 
 # Triggered from a message on a Cloud Pub/Sub topic.
@@ -172,6 +172,6 @@ if __name__ == '__main__':
     # test_main()
     # face_image_generation_for_google_photo(2021, 6, 24, dry_run=True)
     # helper = GooglePhotoHelper()
-    # upload_face_detection_result(helper, '2021_10_17_output-1-to-37.json', TEST_BUCKET_NAME)
-    batch_process_photo(2021, 11, 25)
+    # upload_face_detection_result(helper, '2021_12_5_output-1-to-7.json', TEST_BUCKET_NAME)
+    batch_process_photo(2021, 12, 5)
 

@@ -95,7 +95,7 @@ class GooglePhotoHelper:
             dry_run: boolean, if True, only prints the files that would be uploaded without actually uploading them
             exclude_file_prefix: string, if not None, files with this prefix will not be uploaded
         returns:
-            A list of the file names that were uploaded
+            A dictionary with file names as keys and file content as values
         '''
         media_type_list = []
         if upload_photo:
@@ -137,7 +137,7 @@ class GooglePhotoHelper:
         if 'mediaItems' not in res.json():
             structured_log("No media items found")
             return []
-        file_name_list = []
+        file_name_dict = {}
         storage_api = GoogleStorageHelper(bucket_name)
         for i, item in enumerate(res.json()['mediaItems']):
             if exclude_file_prefix is not None and item['filename'].startswith(exclude_file_prefix):
@@ -151,9 +151,10 @@ class GooglePhotoHelper:
             if not dry_run:
                 # preserving the original file name when uploading.
                 target_file_name = item['filename']
-                storage_api.upload_url_to_google_cloud(base_url, target_file_name, item['mimeType'])
-                file_name_list.append(target_file_name)
-        return file_name_list
+                file_content = requests.get(base_url).content
+                storage_api.upload_string_content_to_google_cloud(file_content, target_file_name, item['mimeType'])
+                file_name_dict[target_file_name] = file_content
+        return file_name_dict
 
     def upload_image_to_photo_album(self, image_bytes, file_name, album_id):
         '''
