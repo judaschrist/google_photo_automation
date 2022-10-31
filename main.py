@@ -75,9 +75,8 @@ def upload_face_detection_result(photo_api_helper, detect_result_file_name, file
                 exif_dict = piexif.load(image.info['exif'])
             except KeyError:
                 # some images does not have proper exif data altogether
-                structured_log('!!! No exif data found for {}, skipping!!!'.format(ori_file_name), severity=LogSeverity.NOTICE)
-                continue
-            if exif_dict and piexif.ExifIFD.DateTimeOriginal in exif_dict['Exif']:
+                exif_dict = {"0th": {}, "Exif": {}}
+            if piexif.ExifIFD.DateTimeOriginal in exif_dict['Exif']:
                 image_creation_time = exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal][:10].decode('utf-8')
             else:
                 image_creation_time = 'UNKONWN_TIME'
@@ -91,8 +90,8 @@ def upload_face_detection_result(photo_api_helper, detect_result_file_name, file
                         face['boundingPoly']['vertices'][2]['y'] if 'y' in face['boundingPoly']['vertices'][2] else image.height,
                     ))
                     # add face detection meta data to exif
-                    if exif_dict:
-                        exif_dict['Exif'][piexif.ExifIFD.UserComment] = json.dumps(face).encode('utf-8')
+                    exif_dict = {"0th": {}, "Exif": {}}
+                    exif_dict['Exif'][piexif.ExifIFD.UserComment] = json.dumps(face).encode('utf-8')
                     exif_bytes = piexif.dump(exif_dict)
                     # get bytes from the cropped image
                     face_crop_bytes = BytesIO()
@@ -148,7 +147,7 @@ def main(cloud_event: CloudEvent):
 def batch_process_photo(year, month, day):
     # batch process photo
     cur_date = datetime(year, month, day)
-    while cur_date < datetime(2022, 4, 25):
+    while cur_date < datetime(2022, 10, 10):
         face_image_generation_for_google_photo(cur_date.year, cur_date.month, cur_date.day)
         cur_date += timedelta(days=1)
 
@@ -170,8 +169,10 @@ def test_main():
 # run this locally as an integrated test
 if __name__ == '__main__':
     # test_main()
-    # face_image_generation_for_google_photo(2021, 6, 24, dry_run=True)
+    # exif = read_exif_user_comment_from_image("/Users/lingxiao/Downloads/auto_detected_face_image_2022_10_29_0_IMG_6293.jpg")
+    # print(exif)
+    face_image_generation_for_google_photo(2022, 10, 29, dry_run=False)
     # helper = GooglePhotoHelper()
     # upload_face_detection_result(helper, '2021_12_5_output-1-to-7.json', TEST_BUCKET_NAME)
-    batch_process_photo(2021, 12, 5)
+    # batch_process_photo(2022, 10, 29)
 

@@ -18,6 +18,19 @@ def generate_face_dataset_from_google_album(album_name, size):
     files.upload_file('uploaded_face.json')
     config.dataset_name = "json"
     dataset = load_dataset(config.dataset_name, data_files="uploaded_face.json", split='train')
+
+    from datasets import Image as DsImage
+    from PIL import Image
+    from io import BytesIO
+    import requests
+
+    # you also need to pre-download the image files to your local machine, since the urls will be expired after an hour
+    def pre_download(example):
+        example['image'] = Image.open(BytesIO(requests.get(example["image_url"]).content))
+        return example
+
+    dataset = dataset.map(pre_download, batched=False)
+    dataset = dataset.cast_column("image", DsImage())
     ```
     '''
     helper = GooglePhotoHelper()
@@ -25,7 +38,7 @@ def generate_face_dataset_from_google_album(album_name, size):
     if len(album_list) != 1:
         raise Exception(f'There should be only one album named {album_name}!')
     url_list = helper.list_face_download_urls_from_album(album_list[0]['id'], size=size)
-    data_json_str_list = [json.dumps({"image": url, "label": album_name}) for url in url_list]
+    data_json_str_list = [json.dumps({"image_url": url, "label": album_name}) for url in url_list]
     # write json lines to file:
     with open(album_name + '_face_dataset.json', 'w') as f:
         f.writelines(data_json_str_list)
@@ -33,4 +46,4 @@ def generate_face_dataset_from_google_album(album_name, size):
 
 
 if __name__ == '__main__':
-    generate_face_dataset_from_google_album(ALBUM_NAME, 200)
+    generate_face_dataset_from_google_album(ALBUM_NAME, 1000)
