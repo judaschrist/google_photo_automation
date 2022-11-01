@@ -6,7 +6,6 @@ import piexif
 import requests
 from requests.exceptions import ConnectionError
 import os
-from retrying import retry
 
 ALBUM_NAME = 'Ada'
 
@@ -53,11 +52,6 @@ def generate_face_dataset_from_google_album_for_hugging_face(album_name, size):
 def retry_if_connection_error(exception):
     return isinstance(exception, ConnectionError)
 
-@retry(retry_on_exception=retry_if_connection_error, wait_fixed=500, stop_max_attempt_number=3, wrap_exception=True)
-def save_image_from_url_helper(url, file_path):
-    image = Image.open(BytesIO(requests.get(url).content))
-    image.save(file_path)
-
 def download_file_into_folder_from_url_list(album_name, size, dir_path):
     # create dir if not exist
     if not os.path.exists(dir_path):
@@ -66,18 +60,7 @@ def download_file_into_folder_from_url_list(album_name, size, dir_path):
     album_list = helper.find_albums_by_name('Ada')
     if len(album_list) != 1:
         raise Exception(f'There should be only one album named {album_name}!')
-    file_name_url_list = helper.list_face_download_urls_from_album(album_list[0]['id'], size=size)
-    print(f'Found {len(file_name_url_list)} images in album {album_name}')
-    for i, file_name_url_pair in enumerate(file_name_url_list):
-        if i % 100 == 0:
-            print(f'Downloading {i}th image...')
-        file_name, url = file_name_url_pair
-        file_name_without_suffix = file_name.split('.')[0]
-        file_name = file_name_without_suffix + '.jpg'
-        file_path = os.path.join(dir_path, file_name)
-        image = Image.open(BytesIO(requests.get(url).content))
-        image.save(file_path)
-
+    helper.list_face_download_urls_from_album(album_list[0]['id'], size=size, download=True, download_dir=dir_path)
 
 def read_exif_user_comment_from_image_file(file_path):
     image = Image.open(file_path)

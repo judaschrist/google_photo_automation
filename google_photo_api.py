@@ -10,6 +10,9 @@ from google.cloud import secretmanager
 from google.api_core.exceptions import NotFound
 from google_logging import structured_log, LogSeverity
 from retrying import retry
+from PIL import Image, UnidentifiedImageError
+from io import BytesIO
+import os
 
 CLIENT_SECRET_FILE = "secrets/google_photo_credentials.json"
 CREDENTIAL_PICKLE_FILE_SECRET_SOURCE = "projects/1083696682843/secrets/google-photo-api-credential-pickle/versions/2"
@@ -31,6 +34,15 @@ def retry_if_connection_error(exception):
 @retry(retry_on_exception=retry_if_connection_error, wait_fixed=500, stop_max_attempt_number=3, wrap_exception=True)
 def safe_retryable_requests(*args, **kwargs):
     return requests.request(*args, **kwargs)
+
+@retry(retry_on_exception=retry_if_connection_error, wait_fixed=500, stop_max_attempt_number=3, wrap_exception=True)
+def save_image_from_url_helper(url, file_path):
+    try:
+        image = Image.open(BytesIO(requests.get(url).content))
+        image.save(file_path)
+    except UnidentifiedImageError:
+        print(f'UnidentifiedImageError: {url}')
+        pass
 
 class GooglePhotoHelper:
     '''
@@ -239,14 +251,18 @@ class GooglePhotoHelper:
             raise Exception('More than one album found, please delete all albums with the name of {}'.format(album_name))
         return album_id
 
-    def list_face_download_urls_from_album(self, album_id, size=100):
+    def list_face_download_urls_from_album(self, album_id, size=100, download=False, download_dir=None):
         '''
         Lists all the base urls of the face images in an album
         Args:
             album_id: string, id of the album
+            download: boolean, whether to download the images
+            download_dir: string, directory to download the images, must be specified if download is True
         returns:
             list of tuples (file_name, download_url)
         '''
+        if download and download_dir is None:
+            raise Exception('download_dir must be specified if download is True')
         url = 'https://photoslibrary.googleapis.com/v1/mediaItems:search'
         payload = {
             "albumId": album_id,
@@ -258,13 +274,21 @@ class GooglePhotoHelper:
         }
         next_page_token = None
         file_url_list = []
+        if download and not os.path.exists(download_dir):
+            os.makedirs(download_dir)
         while True:
             if next_page_token is not None:
                 payload['pageToken'] = next_page_token
             res = safe_retryable_requests("POST", url, data=json.dumps(payload), headers=headers)
             for item in res.json()['mediaItems']:
                 if item['filename'].startswith('auto_detected_face_image_'):
-                    file_url_list.append((item['filename'], item['baseUrl'] + '=d'))
+                    file_name = item['filename'].split('.')[0] + '.jpg'
+                    file_path = os.path.join(download_dir, file_name)
+                    image_url = item['baseUrl'] + '=d'
+                    save_image_from_url_helper(image_url, file_path)
+                    file_url_list.append((item['filename'], image_url))
+                    if len(file_url_list) % 100 == 0:
+                        print('processing {} images'.format(len(file_url_list)))
                     if len(file_url_list) == size:
                         break
             next_page_token = res.json().get('nextPageToken')
@@ -273,11 +297,7 @@ class GooglePhotoHelper:
         return file_url_list
 
 if __name__ == '__main__':
-    helper = GooglePhotoHelper()
-    album_list = helper.find_albums_by_name('Ada')
-    print(album_list)
-    url_list = helper.list_face_download_urls_from_album(album_list[0]['id'], size=200)
-    print(len(url_list))
+    pass
     # print(get_api_credential_from_google_secret())
 
 
