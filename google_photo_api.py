@@ -244,6 +244,8 @@ class GooglePhotoHelper:
         Lists all the base urls of the face images in an album
         Args:
             album_id: string, id of the album
+        returns:
+            list of tuples (file_name, download_url)
         '''
         url = 'https://photoslibrary.googleapis.com/v1/mediaItems:search'
         payload = {
@@ -255,20 +257,20 @@ class GooglePhotoHelper:
             'Authorization': 'Bearer {}'.format(self.cred.token)
         }
         next_page_token = None
-        url_list = []
+        file_url_list = []
         while True:
             if next_page_token is not None:
                 payload['pageToken'] = next_page_token
             res = safe_retryable_requests("POST", url, data=json.dumps(payload), headers=headers)
             for item in res.json()['mediaItems']:
                 if item['filename'].startswith('auto_detected_face_image_'):
-                    url_list.append(item['baseUrl'] + '=d')
-                    if len(url_list) == size:
+                    file_url_list.append((item['filename'], item['baseUrl'] + '=d'))
+                    if len(file_url_list) == size:
                         break
             next_page_token = res.json().get('nextPageToken')
-            if next_page_token is None or len(url_list) == size:
+            if next_page_token is None or len(file_url_list) == size:
                 break
-        return url_list
+        return file_url_list
 
 if __name__ == '__main__':
     helper = GooglePhotoHelper()

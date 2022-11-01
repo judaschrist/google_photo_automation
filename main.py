@@ -11,7 +11,7 @@ import functions_framework
 from datetime import datetime, timedelta
 import base64
 from cloudevents.http.event import CloudEvent
-from google_logging import structured_log, LogSeverity
+from google_logging import structured_log
 
 TEST_BUCKET_NAME = "test-bucket-gpa"
 FACE_IMAGE_FILE_PREFIX = 'auto_detected_face_image_'
@@ -98,15 +98,12 @@ def upload_face_detection_result(photo_api_helper, detect_result_file_name, file
                     face_crop.save(face_crop_bytes, format='JPEG', exif=exif_bytes)
                     # save the cropped image to album
                     structured_log('Uploading face {} of {}'.format(i, ori_file_name))
-                    photo_api_helper.upload_image_to_photo_album(face_crop_bytes.getvalue(), f"{FACE_IMAGE_FILE_PREFIX}{image_creation_time}_{i}_{ori_file_name}", album_id)
+                    # get file name witout extension
+                    file_name_without_ext = ori_file_name.split('.')[0]
+                    photo_api_helper.upload_image_to_photo_album(face_crop_bytes.getvalue(), f"{FACE_IMAGE_FILE_PREFIX}{image_creation_time}_{i}_{file_name_without_ext}.jpeg", album_id)
                 else:
                     structured_log(face['boundingPoly']['vertices'])
 
-
-def read_exif_user_comment_from_image(file_path):
-    image = Image.open(file_path)
-    exif_dict = piexif.load(image.info['exif'])
-    return exif_dict['Exif'][piexif.ExifIFD.UserComment].decode('utf-8')
 
 def face_image_generation_for_google_photo(year, month, day, dry_run=False):
     '''
