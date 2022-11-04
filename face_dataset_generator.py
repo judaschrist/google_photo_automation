@@ -53,19 +53,19 @@ def retry_if_connection_error(exception):
     return isinstance(exception, ConnectionError)
 
 def download_file_into_folder_from_url_list(album_name, size, dir_path):
-    # create dir if not exist
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
     helper = GooglePhotoHelper()
     album_list = helper.find_albums_by_name('Ada')
     if len(album_list) != 1:
         raise Exception(f'There should be only one album named {album_name}!')
-    helper.list_face_download_urls_from_album(album_list[0]['id'], size=size, download=True, download_dir=dir_path)
+    return helper.list_face_download_urls_from_album(album_list[0]['id'], size=size, download=True, download_dir=dir_path)
 
 def read_exif_user_comment_from_image_file(file_path):
     image = Image.open(file_path)
-    exif_dict = piexif.load(image.info['exif'])
-    return exif_dict['Exif'][piexif.ExifIFD.UserComment].decode('utf-8')
+    try:
+        exif_dict = piexif.load(image.info['exif'])
+        return exif_dict['Exif'][piexif.ExifIFD.UserComment].decode('utf-8')
+    except KeyError:
+        return '{}'
 
 def read_exif_user_comment_from_image_url(url):
     image = Image.open(BytesIO(requests.get(url).content))
@@ -74,4 +74,10 @@ def read_exif_user_comment_from_image_url(url):
 
 
 if __name__ == '__main__':
-    download_file_into_folder_from_url_list(ALBUM_NAME, 5000, '/Users/lingxiao/Documents/ada_face_dataset')
+    # testing if the downloaded image has the correct user comment
+    dir = '/Users/lingxiao/Documents/ada_face_test'
+    name_url_list = download_file_into_folder_from_url_list(ALBUM_NAME, 5, dir)
+    for name, url in name_url_list:
+        exif_local = read_exif_user_comment_from_image_file(f"{dir}/{name.split('.')[0]}.jpg")
+        exif_remote = read_exif_user_comment_from_image_url(url)
+        assert exif_local == exif_remote, f"exif_local: {exif_local}, exif_remote: {exif_remote}"

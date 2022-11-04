@@ -39,7 +39,8 @@ def safe_retryable_requests(*args, **kwargs):
 def save_image_from_url_helper(url, file_path):
     try:
         image = Image.open(BytesIO(requests.get(url).content))
-        image.save(file_path)
+        # save original image exif data
+        image.save(file_path, exif=image.info.get('exif'))
     except UnidentifiedImageError:
         print(f'UnidentifiedImageError: {url}')
         pass
@@ -285,7 +286,8 @@ class GooglePhotoHelper:
                     file_name = item['filename'].split('.')[0] + '.jpg'
                     file_path = os.path.join(download_dir, file_name)
                     image_url = item['baseUrl'] + '=d'
-                    save_image_from_url_helper(image_url, file_path)
+                    if download:
+                        save_image_from_url_helper(image_url, file_path)
                     file_url_list.append((item['filename'], image_url))
                     if len(file_url_list) % 100 == 0:
                         print('processing {} images'.format(len(file_url_list)))

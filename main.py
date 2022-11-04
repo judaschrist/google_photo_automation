@@ -165,10 +165,9 @@ def test_main():
 
 # run this locally as an integrated test
 if __name__ == '__main__':
+    pass
     # test_main()
-    # exif = read_exif_user_comment_from_image("/Users/lingxiao/Downloads/auto_detected_face_image_2022_10_29_0_IMG_6293.jpg")
-    # print(exif)
-    face_image_generation_for_google_photo(2022, 10, 29, dry_run=False)
+    # face_image_generation_for_google_photo(2022, 10, 29, dry_run=False)
     # helper = GooglePhotoHelper()
     # upload_face_detection_result(helper, '2021_12_5_output-1-to-7.json', TEST_BUCKET_NAME)
     # batch_process_photo(2022, 10, 29)
