@@ -81,3 +81,5 @@ if __name__ == '__main__':
         exif_local = read_exif_user_comment_from_image_file(f"{dir}/{name.split('.')[0]}.jpg")
         exif_remote = read_exif_user_comment_from_image_url(url)
         assert exif_local == exif_remote, f"exif_local: {exif_local}, exif_remote: {exif_remote}"
+
+    # download_file_into_folder_from_url_list(ALBUM_NAME, 5000, '/Users/lingxiao/Documents/ada_faces')
