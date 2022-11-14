@@ -4,3 +4,4 @@ secrets/*
 env/*
 *_face_dataset.json
 *.gif
+*.mp4
