@@ -1,6 +1,8 @@
 ## Todos
 
 - [X] standardize logging
+- [ ] Logging is not working for the new google cloud API
+- [ ] How to proccess photos that are not uploaded in time?
 - [ ] what if processing time exceeds the limited timeout?
 - [ ] support face detection for videos
 - [ ] instruction for deployment
